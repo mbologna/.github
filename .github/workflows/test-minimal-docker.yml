@@ -22,10 +22,6 @@ on:
         required: false
         type: boolean
         default: true
-    outputs:
-      digest:
-        description: Built image digest
-        value: ${{ jobs.build.outputs.digest }}
     secrets:
       DOCKER_USERNAME:
         required: false
