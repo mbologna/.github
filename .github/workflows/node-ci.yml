@@ -40,11 +40,10 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: ${{ inputs.package_manager }}
 
       - name: Install dependencies (npm)
         if: inputs.package_manager == 'npm'
-        run: npm ci
+        run: npm install
 
       - name: Install dependencies (yarn)
         if: inputs.package_manager == 'yarn'
@@ -55,4 +54,5 @@ jobs:
         continue-on-error: true
 
       - name: Test
+        if: inputs.test_command != ''
         run: ${{ inputs.package_manager }} run ${{ inputs.test_command }}
