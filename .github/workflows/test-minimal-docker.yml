@@ -44,7 +44,6 @@ jobs:
     needs: lint
     permissions:
       contents: read
-      packages: write
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
