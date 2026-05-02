@@ -37,6 +37,15 @@ on:
         required: false
         type: boolean
         default: false
+      yamllint_paths:
+        description: Space-separated paths for yamllint to scan
+        required: false
+        type: string
+        default: .github/workflows/
+    outputs:
+      digest:
+        description: Built image digest
+        value: ${{ jobs.build.outputs.digest }}
     secrets:
       DOCKER_USERNAME:
         required: false
@@ -61,7 +70,7 @@ jobs:
       - name: yamllint
         uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3
         with:
-          file_or_dir: .
+          file_or_dir: ${{ inputs.yamllint_paths }}
           config_data: |
             extends: default
             rules:
@@ -70,6 +79,10 @@ jobs:
                 level: warning
               truthy:
                 allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+              empty-lines:
+                max: 2
+                max-start: 0
+                max-end: 1
 
   build:
     name: Build & Push
