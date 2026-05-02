@@ -41,6 +41,10 @@ jobs:
   build:
     name: Build & Push
     runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+      packages: write
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
@@ -51,8 +55,6 @@ jobs:
     name: Security Scan (trivy)
     runs-on: ubuntu-latest
     needs: build
-    permissions:
-      contents: read
     steps:
       - run: echo "trivy scan"
 
