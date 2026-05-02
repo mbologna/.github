@@ -1,0 +1,15 @@
+name: Test Reusable
+
+on:
+  workflow_call:
+    inputs:
+      message:
+        type: string
+        required: false
+        default: "hello"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "${{ inputs.message }}"
