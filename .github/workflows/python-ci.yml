@@ -1,0 +1,96 @@
+name: Python CI
+
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        description: Python version to use
+        required: false
+        type: string
+        default: "3.12"
+      use_uv:
+        description: Use uv instead of pip
+        required: false
+        type: boolean
+        default: false
+      enable_codecov:
+        description: Upload coverage to Codecov
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up uv
+        if: inputs.use_uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Set up Python
+        if: '!inputs.use_uv'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Install ruff (pip)
+        if: '!inputs.use_uv'
+        run: pip install ruff
+
+      - name: Lint
+        run: |
+          ${{ inputs.use_uv && 'uv run' || '' }} ruff check .
+          ${{ inputs.use_uv && 'uv run' || '' }} ruff format --check .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up uv
+        if: inputs.use_uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: ${{ inputs.python_version }}
+
+      - name: Set up Python
+        if: '!inputs.use_uv'
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: pip
+
+      - name: Install dependencies (pip)
+        if: '!inputs.use_uv'
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f pyproject.toml ]; then pip install -e ".[dev]" 2>/dev/null || pip install -e .; fi
+
+      - name: Install dependencies (uv)
+        if: inputs.use_uv
+        run: uv sync
+
+      - name: Run tests
+        run: |
+          ${{ inputs.use_uv && 'uv run' || '' }} pytest --cov --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        if: inputs.enable_codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6
+        with:
+          files: coverage.xml
