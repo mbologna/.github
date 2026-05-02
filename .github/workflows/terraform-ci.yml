@@ -1,0 +1,204 @@
+name: Terraform CI
+
+on:
+  workflow_call:
+    inputs:
+      terraform_version:
+        description: Terraform version constraint
+        required: false
+        type: string
+        default: "~> 1.9"
+      opentofu_version:
+        description: OpenTofu version
+        required: false
+        type: string
+        default: "1.9.1"
+      enable_terraform_docs:
+        description: Auto-update README with terraform-docs
+        required: false
+        type: boolean
+        default: false
+      enable_shellcheck:
+        description: Run ShellCheck on shell scripts
+        required: false
+        type: boolean
+        default: false
+      shellcheck_files:
+        description: Space-separated list of shell script paths to check
+        required: false
+        type: string
+        default: ""
+      working_dir:
+        description: Terraform root working directory
+        required: false
+        type: string
+        default: "."
+      example_dir:
+        description: Optional example subdirectory to also validate (leave empty to skip)
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  validate:
+    name: Terraform Validate
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+
+      - name: terraform fmt check
+        run: terraform fmt -check -recursive
+        working-directory: ${{ inputs.working_dir }}
+
+      - name: terraform init
+        run: terraform init -backend=false
+        working-directory: ${{ inputs.working_dir }}
+
+      - name: terraform validate
+        run: terraform validate
+        working-directory: ${{ inputs.working_dir }}
+
+      - name: terraform init (example)
+        if: inputs.example_dir != ''
+        run: terraform init -backend=false
+        working-directory: ${{ inputs.example_dir }}
+
+      - name: terraform validate (example)
+        if: inputs.example_dir != ''
+        run: terraform validate
+        working-directory: ${{ inputs.example_dir }}
+
+  tflint:
+    name: tflint
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: terraform-linters/setup-tflint@b480b8fcdaa6f2c577f8e4fa799e89e756bb7c93 # v6
+        with:
+          # renovate: datasource=github-releases depName=terraform-linters/tflint
+          tflint_version: v0.56.0
+
+      - name: tflint init
+        run: tflint --init
+
+      - name: tflint
+        run: tflint --recursive
+
+  opentofu:
+    name: OpenTofu Validate
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: opentofu/setup-opentofu@fc711fa910b93cba0f3fbecaafc9f42fd0c411cb # v2
+        with:
+          # renovate: datasource=github-releases depName=opentofu/opentofu
+          tofu_version: ${{ inputs.opentofu_version }}
+
+      - name: tofu fmt check
+        run: tofu fmt -check -recursive
+        working-directory: ${{ inputs.working_dir }}
+
+      - name: tofu init
+        run: tofu init -backend=false
+        working-directory: ${{ inputs.working_dir }}
+
+      - name: tofu validate
+        run: tofu validate
+        working-directory: ${{ inputs.working_dir }}
+
+      - name: tofu init (example)
+        if: inputs.example_dir != ''
+        run: tofu init -backend=false
+        working-directory: ${{ inputs.example_dir }}
+
+      - name: tofu validate (example)
+        if: inputs.example_dir != ''
+        run: tofu validate
+        working-directory: ${{ inputs.example_dir }}
+
+  yamllint:
+    name: YAML Lint
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: yamllint
+        run: yamllint -d '{extends: relaxed, rules: {line-length: {max: 200}}}' gitops/ .github/workflows/
+        continue-on-error: true
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: actionlint
+        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
+
+  trivy-iac:
+    name: Trivy IaC Scan
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Run Trivy (IaC config scan)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # master
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          skip-dirs: ".terraform,example/.terraform"
+
+  terraform-docs:
+    name: terraform-docs
+    runs-on: ubuntu-24.04
+    if: inputs.enable_terraform_docs
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Update README with terraform-docs
+        uses: terraform-docs/gh-actions@6de6da0cefcc6b4b7a5cbea4d79d97060733093c # v1
+        with:
+          working-dir: ${{ inputs.working_dir }}
+          output-file: README.md
+          output-method: inject
+          config-file: .terraform-docs.yml
+          git-push: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+          fail-on-diff: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          git-commit-message: "docs: auto-update README variables via terraform-docs [skip ci]"
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-24.04
+    if: inputs.enable_shellcheck
+    permissions: {}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: shellcheck --severity=warning ${{ inputs.shellcheck_files }}

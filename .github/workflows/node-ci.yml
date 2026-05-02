@@ -1,0 +1,58 @@
+name: Node.js CI
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        description: Node.js version (used when node_versions matrix is not set)
+        required: false
+        type: string
+        default: lts/*
+      node_versions:
+        description: JSON array of Node.js versions for matrix builds, e.g. '["18.x","20.x","22.x"]'
+        required: false
+        type: string
+        default: ""
+      package_manager:
+        description: Package manager to use (npm or yarn)
+        required: false
+        type: string
+        default: npm
+      test_command:
+        description: npm/yarn script to run for tests
+        required: false
+        type: string
+        default: test
+
+jobs:
+  ci:
+    name: Node.js ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        node-version: ${{ inputs.node_versions != '' && fromJSON(inputs.node_versions) || fromJSON(format('["{0}"]', inputs.node_version)) }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: ${{ inputs.package_manager }}
+
+      - name: Install dependencies (npm)
+        if: inputs.package_manager == 'npm'
+        run: npm ci
+
+      - name: Install dependencies (yarn)
+        if: inputs.package_manager == 'yarn'
+        run: yarn --frozen-lockfile --non-interactive
+
+      - name: Lint
+        run: ${{ inputs.package_manager }} run lint
+        continue-on-error: true
+
+      - name: Test
+        run: ${{ inputs.package_manager }} run ${{ inputs.test_command }}

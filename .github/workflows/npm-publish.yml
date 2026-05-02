@@ -1,0 +1,52 @@
+name: Publish to npm
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        description: Node.js version
+        required: false
+        type: string
+        default: lts/*
+      package_manager:
+        description: Package manager to use (npm or yarn)
+        required: false
+        type: string
+        default: npm
+    secrets:
+      NPM_TOKEN:
+        required: true
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ inputs.node_version }}
+          registry-url: https://registry.npmjs.org
+          cache: ${{ inputs.package_manager }}
+
+      - name: Install dependencies (npm)
+        if: inputs.package_manager == 'npm'
+        run: npm ci
+
+      - name: Install dependencies (yarn)
+        if: inputs.package_manager == 'yarn'
+        run: yarn --frozen-lockfile --non-interactive
+
+      - name: Lint
+        run: ${{ inputs.package_manager }} run lint
+        continue-on-error: true
+
+      - name: Publish to npm (with provenance)
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
