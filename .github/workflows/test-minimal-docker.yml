@@ -63,13 +63,3 @@ jobs:
     steps:
       - run: echo "trivy scan"
 
-  scan-grype:
-    name: Security Scan (grype)
-    runs-on: ubuntu-latest
-    needs: build
-    if: inputs.enable_grype && github.event_name != 'pull_request'
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - run: echo "grype scan"
