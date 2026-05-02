@@ -1,0 +1,49 @@
+name: Test Minimal Docker
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+      push_to_dockerhub:
+        required: false
+        type: boolean
+        default: true
+      platforms:
+        required: false
+        type: string
+        default: linux/amd64,linux/arm64
+      yamllint_paths:
+        required: false
+        type: string
+        default: .github/workflows/
+    outputs:
+      digest:
+        description: Built image digest
+        value: ${{ jobs.build.outputs.digest }}
+    secrets:
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - run: echo "lint done"
+
+  build:
+    name: Build & Push
+    runs-on: ubuntu-latest
+    needs: lint
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - run: echo "digest=sha256:abc123" >> $GITHUB_OUTPUT
+        id: build
