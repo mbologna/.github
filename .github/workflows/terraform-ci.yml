@@ -136,7 +136,9 @@ jobs:
         run: pip install yamllint
 
       - name: yamllint
-        run: yamllint -d '{extends: relaxed, rules: {line-length: {max: 200}}}' gitops/ .github/workflows/
+        run: |
+          yamllint -d '{extends: relaxed, rules: {line-length: {max: 200}}}' \
+            gitops/ .github/workflows/
         continue-on-error: true
 
   actionlint:
