@@ -94,7 +94,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-      attestations: write
       security-events: write
     outputs:
       digest: ${{ steps.build.outputs.digest }}
