@@ -124,10 +124,12 @@ jobs:
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@030e881283bb7a6894de51c315a6bfe6a94e05cf # v6
+        env:
+          DOCKERHUB_IMAGE: ${{ format('{0}/{1}', secrets.DOCKER_USERNAME, inputs.image_name) }}
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}
-            ${{ inputs.push_to_dockerhub && github.event_name != 'pull_request' && format('{0}/{1}', secrets.DOCKER_USERNAME, inputs.image_name) || '' }}
+            ${{ inputs.push_to_dockerhub && github.event_name != 'pull_request' && env.DOCKERHUB_IMAGE || '' }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
