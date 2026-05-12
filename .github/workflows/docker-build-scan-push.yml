@@ -127,7 +127,7 @@ jobs:
         with:
           images: |
             ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}
-            ${{ inputs.push_to_dockerhub && format('{0}/{1}', secrets.DOCKER_USERNAME, inputs.image_name) || '' }}
+            ${{ inputs.push_to_dockerhub && github.event_name != 'pull_request' && format('{0}/{1}', secrets.DOCKER_USERNAME, inputs.image_name) || '' }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
