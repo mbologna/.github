@@ -1,0 +1,72 @@
+name: GCP Deploy
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: Docker image name (used to pull from GHCR, e.g. sunrise-sunset-calendar)
+        required: true
+        type: string
+      ar_image:
+        description: Full Artifact Registry image URI (e.g. europe-west1-docker.pkg.dev/project/repo/app)
+        required: true
+        type: string
+      deploy_type:
+        description: "Cloud Run resource type: 'service' or 'job'"
+        required: false
+        type: string
+        default: service
+      deploy_name:
+        description: Cloud Run service or job name to deploy
+        required: true
+        type: string
+      region:
+        description: GCP region
+        required: false
+        type: string
+        default: europe-west1
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: true
+      GCP_SERVICE_ACCOUNT:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute short SHA
+        id: sha
+        run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
+
+      - name: Mirror GHCR → Artifact Registry
+        run: |
+          docker buildx imagetools create \
+            --tag ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }} \
+            --tag ${{ inputs.ar_image }}:latest \
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:sha-${{ steps.sha.outputs.short }}
+
+      - name: Deploy Cloud Run Service
+        if: inputs.deploy_type == 'service'
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ inputs.deploy_name }}
+          image: ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }}
+          region: ${{ inputs.region }}
+
+      - name: Deploy Cloud Run Job
+        if: inputs.deploy_type == 'job'
+        run: |
+          gcloud run jobs deploy ${{ inputs.deploy_name }} \
+            --image ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }} \
+            --region ${{ inputs.region }}
