@@ -31,13 +31,35 @@ on:
       GCP_SERVICE_ACCOUNT:
         required: true
 
+# WIF requires id-token: write; packages: read is needed to pull from GHCR.
+# Note: GHCR source images must be public, or the calling workflow must grant
+# packages: read and pass secrets: inherit so github.token has pull access.
+permissions:
+  id-token: write
+  contents: read
+  packages: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate deploy_type
+        run: |
+          if [[ "${{ inputs.deploy_type }}" != "service" && "${{ inputs.deploy_type }}" != "job" ]]; then
+            echo "::error::deploy_type must be 'service' or 'job', got '${{ inputs.deploy_type }}'"
+            exit 1
+          fi
+
       - name: Compute short SHA
         id: sha
         run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - uses: google-github-actions/auth@v2
         with:
@@ -69,4 +91,5 @@ jobs:
         run: |
           gcloud run jobs deploy ${{ inputs.deploy_name }} \
             --image ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }} \
-            --region ${{ inputs.region }}
+            --region ${{ inputs.region }} \
+            --quiet
