@@ -88,7 +88,7 @@ jobs:
 
       - name: Deploy Cloud Run Service
         if: inputs.deploy_type == 'service'
-        uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2
+        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
           service: ${{ inputs.deploy_name }}
           image: ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }}
