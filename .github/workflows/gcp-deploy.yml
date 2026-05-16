@@ -31,9 +31,8 @@ on:
       GCP_SERVICE_ACCOUNT:
         required: true
 
-# WIF requires id-token: write; packages: read is needed to pull from GHCR.
-# Note: GHCR source images must be public, or the calling workflow must grant
-# packages: read and pass secrets: inherit so github.token has pull access.
+# WIF requires id-token: write.
+# packages: read allows pulling public or private GHCR images via github.token.
 permissions:
   id-token: write
   contents: read
@@ -44,9 +43,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate deploy_type
+        env:
+          DEPLOY_TYPE: ${{ inputs.deploy_type }}
         run: |
-          if [[ "${{ inputs.deploy_type }}" != "service" && "${{ inputs.deploy_type }}" != "job" ]]; then
-            echo "::error::deploy_type must be 'service' or 'job', got '${{ inputs.deploy_type }}'"
+          if [[ "$DEPLOY_TYPE" != "service" && "$DEPLOY_TYPE" != "job" ]]; then
+            echo "::error::deploy_type must be 'service' or 'job', got '$DEPLOY_TYPE'"
             exit 1
           fi
 
@@ -55,32 +56,39 @@ jobs:
         run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
+        env:
+          REGION: ${{ inputs.region }}
+        run: gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
 
       - name: Mirror GHCR → Artifact Registry
+        env:
+          AR_IMAGE: ${{ inputs.ar_image }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          SHORT_SHA: ${{ steps.sha.outputs.short }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           docker buildx imagetools create \
-            --tag ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }} \
-            --tag ${{ inputs.ar_image }}:latest \
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:sha-${{ steps.sha.outputs.short }}
+            --tag "$AR_IMAGE:sha-$SHORT_SHA" \
+            --tag "$AR_IMAGE:latest" \
+            "ghcr.io/$REPO_OWNER/$IMAGE_NAME:sha-$SHORT_SHA"
 
       - name: Deploy Cloud Run Service
         if: inputs.deploy_type == 'service'
-        uses: google-github-actions/deploy-cloudrun@v2
+        uses: google-github-actions/deploy-cloudrun@251330ba9a8a34bfbc1622895f42e1d53fd14522 # v2
         with:
           service: ${{ inputs.deploy_name }}
           image: ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }}
@@ -88,8 +96,13 @@ jobs:
 
       - name: Deploy Cloud Run Job
         if: inputs.deploy_type == 'job'
+        env:
+          DEPLOY_NAME: ${{ inputs.deploy_name }}
+          AR_IMAGE: ${{ inputs.ar_image }}
+          SHORT_SHA: ${{ steps.sha.outputs.short }}
+          REGION: ${{ inputs.region }}
         run: |
-          gcloud run jobs deploy ${{ inputs.deploy_name }} \
-            --image ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }} \
-            --region ${{ inputs.region }} \
+          gcloud run jobs deploy "$DEPLOY_NAME" \
+            --image "$AR_IMAGE:sha-$SHORT_SHA" \
+            --region "$REGION" \
             --quiet
