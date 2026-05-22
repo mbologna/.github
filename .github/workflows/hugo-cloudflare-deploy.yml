@@ -1,0 +1,58 @@
+name: Hugo Cloudflare Deploy
+
+on:
+  workflow_call:
+    inputs:
+      hugo_version:
+        description: Hugo version to use
+        required: false
+        type: string
+        default: '0.161.1'
+      cloudflare_project_name:
+        description: Cloudflare Pages project name
+        required: true
+        type: string
+      websub_feed_url:
+        description: WebSub feed URL to ping after deploy (leave empty to skip)
+        required: false
+        type: string
+        default: ''
+    secrets:
+      CLOUDFLARE_API_TOKEN:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: ${{ inputs.hugo_version }}
+          extended: true
+
+      - name: Build
+        run: hugo --minify
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy public --project-name ${{ inputs.cloudflare_project_name }}
+
+      - name: Ping WebSub hub
+        if: inputs.websub_feed_url != ''
+        env:
+          WEBSUB_FEED_URL: ${{ inputs.websub_feed_url }}
+        run: |
+          curl -s -o /dev/null -X POST https://pubsubhubbub.appspot.com/ \
+            --data-urlencode "hub.mode=publish" \
+            --data-urlencode "hub.url=$WEBSUB_FEED_URL"
