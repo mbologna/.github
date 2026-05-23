@@ -1,0 +1,46 @@
+name: Hugo Link Check
+
+on:
+  workflow_call:
+    inputs:
+      hugo_version:
+        description: Hugo version to use
+        required: false
+        type: string
+        default: '0.161.1'
+      fail_on_broken:
+        description: Fail the job if broken links are found
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@2752ce1d29631191ea3f27c23495fa06139a5b78 # v3
+        with:
+          hugo-version: ${{ inputs.hugo_version }}
+          extended: true
+
+      - name: Build
+        run: hugo --minify
+
+      - name: Check links
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2
+        with:
+          args: >-
+            --base ./public
+            --timeout 30
+            --max-retries 3
+            --exclude-mail
+            ./public/**/*.html
+          fail: ${{ inputs.fail_on_broken }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
