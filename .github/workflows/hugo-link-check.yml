@@ -39,7 +39,7 @@ jobs:
             --root-dir ./public
             --timeout 30
             --max-retries 3
-            ./public/**/*.html
+            ./public/
           fail: ${{ inputs.fail_on_broken }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
