@@ -39,7 +39,6 @@ jobs:
             --root-dir ./public
             --timeout 30
             --max-retries 3
-            --exclude-mail
             ./public/**/*.html
           fail: ${{ inputs.fail_on_broken }}
         env:
