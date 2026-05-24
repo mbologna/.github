@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   link-check:
@@ -41,5 +42,6 @@ jobs:
             --max-retries 3
             ./public/
           fail: ${{ inputs.fail_on_broken }}
+          issue: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
