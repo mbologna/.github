@@ -1,4 +1,4 @@
-name: Docker Build, Scan and Push
+name: Docker CI
 
 on:
   workflow_call:
