@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       ar_image:
-        description: Full Artifact Registry image URI (e.g. europe-west1-docker.pkg.dev/project/repo/app)
+        description: Full Artifact Registry image URI (e.g. us-central1-docker.pkg.dev/project/repo/app)
         required: true
         type: string
       deploy_type:
