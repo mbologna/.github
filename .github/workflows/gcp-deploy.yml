@@ -4,11 +4,7 @@ on:
   workflow_call:
     inputs:
       image_name:
-        description: Docker image name (used to pull from GHCR, e.g. sunrise-sunset-calendar)
-        required: true
-        type: string
-      ar_image:
-        description: Full Artifact Registry image URI (e.g. us-central1-docker.pkg.dev/project/repo/app)
+        description: Docker image name (e.g. sunrise-sunset-calendar) — pulled from docker.io/mbologna/{image_name}
         required: true
         type: string
       deploy_type:
@@ -32,11 +28,9 @@ on:
         required: true
 
 # WIF requires id-token: write.
-# packages: read allows pulling public or private GHCR images via github.token.
 permissions:
   id-token: write
   contents: read
-  packages: read
 
 jobs:
   deploy:
@@ -55,13 +49,6 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GHCR
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -69,40 +56,23 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
-      - name: Configure Docker for Artifact Registry
-        env:
-          REGION: ${{ inputs.region }}
-        run: gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
-
-      - name: Mirror GHCR → Artifact Registry
-        env:
-          AR_IMAGE: ${{ inputs.ar_image }}
-          IMAGE_NAME: ${{ inputs.image_name }}
-          SHORT_SHA: ${{ steps.sha.outputs.short }}
-          REPO_OWNER: ${{ github.repository_owner }}
-        run: |
-          docker buildx imagetools create \
-            --tag "$AR_IMAGE:sha-$SHORT_SHA" \
-            --tag "$AR_IMAGE:latest" \
-            "ghcr.io/$REPO_OWNER/$IMAGE_NAME:sha-$SHORT_SHA"
-
       - name: Deploy Cloud Run Service
         if: inputs.deploy_type == 'service'
         uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
         with:
           service: ${{ inputs.deploy_name }}
-          image: ${{ inputs.ar_image }}:sha-${{ steps.sha.outputs.short }}
+          image: docker.io/mbologna/${{ inputs.image_name }}:sha-${{ steps.sha.outputs.short }}
           region: ${{ inputs.region }}
 
       - name: Deploy Cloud Run Job
         if: inputs.deploy_type == 'job'
         env:
           DEPLOY_NAME: ${{ inputs.deploy_name }}
-          AR_IMAGE: ${{ inputs.ar_image }}
+          IMAGE_NAME: ${{ inputs.image_name }}
           SHORT_SHA: ${{ steps.sha.outputs.short }}
           REGION: ${{ inputs.region }}
         run: |
           gcloud run jobs deploy "$DEPLOY_NAME" \
-            --image "$AR_IMAGE:sha-$SHORT_SHA" \
+            --image "docker.io/mbologna/$IMAGE_NAME:sha-$SHORT_SHA" \
             --region "$REGION" \
             --quiet
