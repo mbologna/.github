@@ -1,0 +1,660 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "configMigration": true,
+  "prCreation": "notPending",
+  "pinDigests": true,
+  "osvVulnerabilityAlerts": true,
+  "labels": [
+    "dependencies"
+  ],
+  "commitMessageAction": "update",
+  "commitMessagePrefix": "chore(deps):",
+  "rebaseWhen": "auto",
+  "gitIgnoredAuthors": [
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
+  "platformAutomerge": false,
+  "automergeStrategy": "squash",
+  "separateMultipleMajor": true,
+  "transitiveRemediation": true,
+  "internalChecksAsSuccess": true,
+  "prTitle": "{{commitMessagePrefix}} {{commitMessageAction}} {{commitMessageTopic}}{{#if isLockfileUpdate}} (lockfile){{else}} {{commitMessageExtra}}{{/if}}{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}} [automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}} [automerge]{{else if isLockfileUpdate}} [automerge]{{else if isMajor}}{{else}} [automerge]{{/if}}",
+  "prBodyNotes": [
+    "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if isMinor}}📅 Held for a **14-day** stability window before automerge.{{else}}📅 Held for a **7-day** stability window before automerge.{{/if}}"
+  ],
+  "dependencyDashboardTitle": "\ud83e\udd16 Renovate Dependency Dashboard",
+  "dependencyDashboardLabels": [
+    "renovate",
+    "dependencies"
+  ],
+  "vulnerabilityAlerts": {
+    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): add security label, fix(security): prefix, bypass age gate and schedule, automerge on green CI. 1-minute floor (not 0 days) ensures Renovate posts a stability check — 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses which blocks automerge on repos without CI. relaxed behaviour because CVE fix packages may lack a releaseTimestamp.",
+    "labels": [
+      "dependencies",
+      "security"
+    ],
+    "commitMessagePrefix": "fix(security):",
+    "minimumReleaseAge": "1 minute",
+    "minimumReleaseAgeBehaviour": "relaxed",
+    "schedule": [
+      "at any time"
+    ],
+    "automergeSchedule": [
+      "at any time"
+    ],
+    "automerge": true
+  },
+  "gomod": {
+    "ignorePaths": [
+      "**/vendor/**"
+    ]
+  },
+  "pre-commit": {
+    "pinDigests": false
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "commitMessageAction": "maintain",
+    "commitMessageTopic": "lock files",
+    "schedule": [
+      "before 9am on monday"
+    ],
+    "minimumReleaseAge": "1 minute",
+    "minimumReleaseAgeBehaviour": "relaxed"
+  },
+  "packageRules": [
+    {
+      "description": "Major updates: hold 30 days to let the ecosystem surface breaking changes and incompatibilities, then assign for manual review \u2014 no auto-merge",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "minimumReleaseAge": "30 days",
+      "labels": [
+        "major"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "mbologna"
+      ]
+    },
+    {
+      "description": "Patch and pin updates: hold 7 days to let the community catch supply-chain attacks before auto-merging on green CI",
+      "matchUpdateTypes": [
+        "patch",
+        "pin"
+      ],
+      "minimumReleaseAge": "7 days",
+      "automerge": true
+    },
+    {
+      "description": "Digest and pinDigest updates: 1-minute floor forces Renovate to post a stability check. 0 days normalises to null internally (no check posted = branch stays pending forever on repos without CI). relaxed behaviour required because digest SHAs (GitHub Actions, Docker, etc.) carry no releaseTimestamp — with the default 'require' behaviour the check would stay PENDING forever regardless of how many times Renovate runs. internalChecksAsSuccess handles repos without CI.",
+      "matchUpdateTypes": [
+        "digest",
+        "pinDigest"
+      ],
+      "minimumReleaseAge": "1 minute",
+      "minimumReleaseAgeBehaviour": "relaxed",
+      "automerge": true,
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "Minor updates: hold 14 days to let the community catch supply-chain attacks before auto-merging on green CI",
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "minimumReleaseAge": "14 days",
+      "automerge": true
+    },
+    {
+      "description": "GitHub Actions: never auto-merge \u2014 workflow changes run with repo permissions and are a supply-chain risk",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "mbologna"
+      ]
+    },
+    {
+      "description": "Security-categorised packages (e.g. cryptography, openssl — any update, not just CVE-triggered): fix(security): prefix, bypass age gate and schedule, jump queue with prPriority 10, automerge on green CI. Settings intentionally mirror vulnerabilityAlerts so both paths get the same urgency; prPriority is the only setting not covered there. 1-minute floor (not 0 days) + relaxed for the same reason as vulnerabilityAlerts: 0 days normalises to null, no check is posted, automerge is blocked on repos without CI.",
+      "matchCategories": [
+        "security"
+      ],
+      "commitMessagePrefix": "fix(security):",
+      "minimumReleaseAge": "1 minute",
+      "minimumReleaseAgeBehaviour": "relaxed",
+      "prPriority": 10,
+      "automerge": true,
+      "reviewers": [],
+      "schedule": [
+        "at any time"
+      ],
+      "automergeSchedule": [
+        "at any time"
+      ]
+    },
+    {
+      "description": "Regex-managed versions: one PR per package; include from/to versions and update type",
+      "matchManagers": [
+        "regex",
+        "custom.regex"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "groupName": null,
+      "commitMessageTopic": "{{depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "Regex-managed digest updates: no extra info in commit message \u2014 digest is self-explanatory",
+      "matchManagers": [
+        "regex",
+        "custom.regex"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": null,
+      "commitMessageTopic": "{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "Regex-managed helm charts: add helm/ prefix, overrides topic from both version and digest regex rules above \u2014 commitMessageExtra is inherited from whichever of those matched first",
+      "matchManagers": [
+        "regex",
+        "custom.regex"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
+      "commitMessageTopic": "helm/{{depName}}"
+    },
+    {
+      "description": "kubernetes images: docker/ prefix, strip org/registry path keeping only image name, include from/to versions and update type",
+      "matchManagers": [
+        "kubernetes"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "kubernetes images digest: no extra info in commit message",
+      "matchManagers": [
+        "kubernetes"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": "docker digests",
+      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "argocd: helm/ prefix, strip org/registry path keeping only chart name, include from/to versions and update type",
+      "matchManagers": [
+        "argocd"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "argocd digest: no extra info in commit message",
+      "matchManagers": [
+        "argocd"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "helmfile/helm-values: helm/ prefix, strip org/registry keeping only chart name, include from/to versions and update type",
+      "matchManagers": [
+        "helmfile",
+        "helm-values"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "helmfile/helm-values digest: no extra info in commit message",
+      "matchManagers": [
+        "helmfile",
+        "helm-values"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "terraform: terraform/ prefix, use resolved versions not constraint strings, include update type; bump range lower bound to the new version rather than widening the constraint; currentVersion is absent for lockfile-only updates so make the 'from' clause conditional",
+      "matchManagers": [
+        "terraform"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "lockFileMaintenance"
+      ],
+      "commitMessageTopic": "terraform/{{depName}}",
+      "commitMessageExtra": "{{#if currentVersion}}from {{currentVersion}} to {{/if}}{{newVersion}} ({{updateType}})",
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "terraform digest: no extra info in commit message",
+      "matchManagers": [
+        "terraform"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "terraform/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "dockerfile: docker/ prefix, strip org/registry path keeping only image name, include from/to versions and update type",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "dockerfile digest: no extra info in commit message",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": "docker digests",
+      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "npm: add npm/ prefix, use resolved versions not constraint strings, include update type; dedupe lock file after each update",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "npm/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})",
+      "rangeStrategy": "bump",
+      "postUpdateOptions": [
+        "npmDedupe"
+      ]
+    },
+    {
+      "description": "composer: composer/ prefix, from/to resolved versions and update type; bump range lower bound to the new version rather than widening the constraint",
+      "matchManagers": [
+        "composer"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "composer/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})",
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "composer digest: no extra info in commit message",
+      "matchManagers": [
+        "composer"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "composer/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "github-actions: action/ prefix, strip org keeping only action name, include from/to versions and update type",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "github-actions pin/pinDigest: lowercase action word, show target SHA, include update type (built-in uses capital Pin and overrides topic)",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "pin",
+        "pinDigest"
+      ],
+      "commitMessageAction": "pin",
+      "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "to {{newDigestShort}} (pin)"
+    },
+    {
+      "description": "github-actions digest: no extra info in commit message",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run — skip stability window, bypass schedule, automerge on green CI, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. relaxed release-age behaviour because github-digest SHAs carry no releaseTimestamp — timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique — without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "mbologna/.github"
+      ],
+      "minimumReleaseAge": "1 minute",
+      "minimumReleaseAgeBehaviour": "relaxed",
+      "schedule": [
+        "at any time"
+      ],
+      "automergeSchedule": [
+        "at any time"
+      ],
+      "automerge": true,
+      "reviewers": [],
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+    },
+    {
+      "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type",
+      "matchManagers": [
+        "pip_requirements",
+        "pip-compile"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "pip/{{depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "pip_requirements/pip-compile digest: no extra info in commit message",
+      "matchManagers": [
+        "pip_requirements",
+        "pip-compile"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "pip/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "pep621/uv: pip/ prefix, use resolved versions (always pinned), include update type",
+      "matchManagers": [
+        "pep621",
+        "uv"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "pip/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
+    },
+    {
+      "description": "pep621/uv digest: no extra info in commit message",
+      "matchManagers": [
+        "pep621",
+        "uv"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "pip/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "pre-commit hooks: hook/ prefix, strip org keeping only hook name, include from/to versions and update type; use currentValue/newValue (raw tag) since some repos use non-semver tags where currentVersion would be empty",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "hook/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "pre-commit hooks digest: no extra info in commit message",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "hook/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "bundler: gem/ prefix, from/to resolved versions and update type",
+      "matchManagers": [
+        "bundler"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "gem/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
+    },
+    {
+      "description": "bundler digest: no extra info in commit message",
+      "matchManagers": [
+        "bundler"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "gem/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "docker-compose: docker/ prefix, strip org/registry keeping only image name, include from/to versions and update type",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "docker-compose digest: no extra info in commit message",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": "docker digests",
+      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "cargo: rust/ prefix, use resolved versions, include update type; bump range lower bound to the new version rather than widening the constraint",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "rust/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})",
+      "rangeStrategy": "bump"
+    },
+    {
+      "description": "cargo digest: no extra info in commit message",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "rust/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "gomod: go/ prefix, use resolved versions, include update type",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "go/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
+    },
+    {
+      "description": "gomod digest: no extra info in commit message",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "go/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "maven: maven/ prefix, use resolved versions, include update type",
+      "matchManagers": [
+        "maven"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "maven/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
+    },
+    {
+      "description": "maven digest: no extra info in commit message",
+      "matchManagers": [
+        "maven"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "maven/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "gradle/gradle-wrapper: gradle/ prefix, use resolved versions, include update type",
+      "matchManagers": [
+        "gradle",
+        "gradle-wrapper"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "gradle/{{depName}}",
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
+    },
+    {
+      "description": "gradle/gradle-wrapper digest: no extra info in commit message",
+      "matchManagers": [
+        "gradle",
+        "gradle-wrapper"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "commitMessageTopic": "gradle/{{depName}}",
+      "commitMessageExtra": "(digest)"
+    },
+    {
+      "description": "nvm/.nvmrc/.node-version: node/ prefix, include from/to versions and update type",
+      "matchManagers": [
+        "nvm"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin"
+      ],
+      "commitMessageTopic": "node/{{depName}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    }
+  ]
+}
