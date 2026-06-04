@@ -1,0 +1,90 @@
+name: PHP CI
+
+on:
+  workflow_call:
+    inputs:
+      php_version:
+        description: PHP version
+        required: false
+        type: string
+        default: "8.3"
+      php_extensions:
+        description: Comma-separated list of PHP extensions to install
+        required: false
+        type: string
+        default: ""
+      composer_options:
+        description: Options passed to composer install
+        required: false
+        type: string
+        default: "--no-interaction --prefer-dist"
+      test_command:
+        description: Command to run tests
+        required: false
+        type: string
+        default: vendor/bin/phpunit
+      enable_test:
+        description: Run the test job
+        required: false
+        type: boolean
+        default: true
+      enable_lint:
+        description: Run a lint check
+        required: false
+        type: boolean
+        default: false
+      lint_command:
+        description: Lint command to run (defaults to php-cs-fixer fix --dry-run --diff --verbose)
+        required: false
+        type: string
+        default: ""
+      lint_tools:
+        description: PHP tools to install for the lint job (comma-separated)
+        required: false
+        type: string
+        default: php-cs-fixer
+
+jobs:
+  ci:
+    name: PHP ${{ inputs.php_version }}
+    runs-on: ubuntu-latest
+    if: inputs.enable_test
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
+        with:
+          php-version: ${{ inputs.php_version }}
+          extensions: ${{ inputs.php_extensions }}
+          coverage: none
+          tools: composer
+
+      - name: Validate composer.json
+        run: composer validate --strict
+        continue-on-error: true
+
+      - name: Install dependencies
+        run: composer install ${{ inputs.composer_options }}
+
+      - name: Run tests
+        run: ${{ inputs.test_command }}
+
+  lint:
+    name: Lint PHP
+    runs-on: ubuntu-latest
+    if: inputs.enable_lint
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
+        with:
+          php-version: ${{ inputs.php_version }}
+          tools: ${{ inputs.lint_tools }}
+
+      - name: Lint
+        run: ${{ inputs.lint_command != '' && inputs.lint_command || 'php-cs-fixer fix --dry-run --diff --verbose' }}
+        continue-on-error: true
