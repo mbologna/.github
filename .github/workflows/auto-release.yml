@@ -1,0 +1,91 @@
+name: Auto Release
+
+on:
+  workflow_call:
+    inputs:
+      strategy:
+        description: "'docker' (compare image digests) or 'commits' (any commit since last tag)"
+        required: true
+        type: string
+      image:
+        description: "Full Docker image ref for docker strategy (e.g. docker.io/mbologna/docker-bitlbee)"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  auto-release:
+    name: Auto Release (${{ inputs.strategy }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Get latest semver tag
+        id: latest
+        run: |
+          TAG=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
+          if [ -z "$TAG" ]; then
+            echo "No semver tag found — skipping (create an initial tag manually to bootstrap auto-release)"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+          else
+            echo "Latest tag: $TAG"
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if release needed
+        id: check
+        if: steps.latest.outputs.tag != ''
+        run: |
+          set -eo pipefail
+          NEEDED=false
+
+          if [ "${{ inputs.strategy }}" = "docker" ]; then
+            REPO=$(echo "${{ inputs.image }}" | sed 's|^docker\.io/||')
+            VERSION="${{ steps.latest.outputs.tag }}"
+            VERSION="${VERSION#v}"
+
+            TAGGED=$(curl -sf "https://hub.docker.com/v2/repositories/${REPO}/tags/${VERSION}" \
+              | jq -r '.digest // empty')
+            LATEST=$(curl -sf "https://hub.docker.com/v2/repositories/${REPO}/tags/latest" \
+              | jq -r '.digest // empty')
+
+            echo "Tagged (${VERSION}) digest : ${TAGGED:-not found}"
+            echo "Latest              digest : ${LATEST:-not found}"
+
+            if [ -n "$TAGGED" ] && [ -n "$LATEST" ] && [ "$TAGGED" != "$LATEST" ]; then
+              NEEDED=true
+            fi
+
+          elif [ "${{ inputs.strategy }}" = "commits" ]; then
+            COUNT=$(git log "${{ steps.latest.outputs.tag }}..HEAD" --oneline | wc -l | tr -d ' ')
+            echo "Commits since ${{ steps.latest.outputs.tag }}: ${COUNT}"
+            [ "$COUNT" -gt 0 ] && NEEDED=true
+          fi
+
+          echo "needed=${NEEDED}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute next patch version
+        id: next
+        if: steps.check.outputs.needed == 'true'
+        run: |
+          TAG="${{ steps.latest.outputs.tag }}"
+          VER="${TAG#v}"
+          MAJOR=$(echo "$VER" | cut -d. -f1)
+          MINOR=$(echo "$VER" | cut -d. -f2)
+          PATCH=$(echo "$VER" | cut -d. -f3)
+          NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Next tag: ${NEW_TAG}"
+
+      - name: Push tag
+        if: steps.next.outputs.new_tag != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.next.outputs.new_tag }}"
+          git push origin "${{ steps.next.outputs.new_tag }}"
+          echo "Released: ${{ steps.next.outputs.new_tag }}"
