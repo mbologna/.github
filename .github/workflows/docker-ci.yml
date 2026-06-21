@@ -100,10 +100,10 @@ jobs:
         include:
           - platform: linux/amd64
             runner: ubuntu-latest
-            cache-scope: linux-amd64
+            cache_scope: linux-amd64
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
-            cache-scope: linux-arm64
+            cache_scope: linux-arm64
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -125,8 +125,8 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
-          cache-from: type=gha,scope=${{ matrix.cache-scope }}
-          cache-to: type=gha,scope=${{ matrix.cache-scope }},mode=max
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,scope=${{ matrix.cache_scope }},mode=max
           provenance: false
           sbom: false
 
@@ -141,7 +141,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
-          name: digest-${{ matrix.cache-scope }}
+          name: digest-${{ matrix.cache_scope }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
