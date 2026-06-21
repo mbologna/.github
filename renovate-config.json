@@ -68,6 +68,15 @@
   },
   "packageRules": [
     {
+      "description": "Lockfile-only (transitive) updates: automerge on green CI. 1-minute floor + relaxed ensures Renovate posts a stability check \u2014 transitive deps may lack releaseTimestamp so timestamp-required would block automerge forever.",
+      "matchUpdateTypes": [
+        "lockFileUpdate"
+      ],
+      "minimumReleaseAge": "1 minute",
+      "minimumReleaseAgeBehaviour": "relaxed",
+      "automerge": true
+    },
+    {
       "description": "Major updates: hold 30 days to let the ecosystem surface breaking changes and incompatibilities, then assign for manual review \u2014 no auto-merge",
       "matchUpdateTypes": [
         "major"
@@ -99,7 +108,7 @@
       "minimumReleaseAge": "1 minute",
       "minimumReleaseAgeBehaviour": "relaxed",
       "automerge": true,
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "Minor updates: hold 14 days to let the community catch supply-chain attacks before auto-merging on green CI",
@@ -164,7 +173,7 @@
       ],
       "groupName": null,
       "commitMessageTopic": "{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "Regex-managed helm charts: add helm/ prefix, overrides topic from both version and digest regex rules above \u2014 commitMessageExtra is inherited from whichever of those matched first",
@@ -200,7 +209,7 @@
         "digest"
       ],
       "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "argocd: helm/ prefix, strip org/registry path keeping only chart name, include from/to versions and update type",
@@ -225,7 +234,7 @@
         "digest"
       ],
       "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "helmfile/helm-values: helm/ prefix, strip org/registry keeping only chart name, include from/to versions and update type",
@@ -252,7 +261,7 @@
         "digest"
       ],
       "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "terraform: terraform/ prefix, use resolved versions not constraint strings, include update type; bump range lower bound to the new version rather than widening the constraint; currentVersion is absent for lockfile-only updates so make the 'from' clause conditional",
@@ -279,7 +288,7 @@
         "digest"
       ],
       "commitMessageTopic": "terraform/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "dockerfile: docker/ prefix, strip org/registry path keeping only image name, include from/to versions and update type",
@@ -304,7 +313,7 @@
         "digest"
       ],
       "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "npm: add npm/ prefix, use resolved versions not constraint strings, include update type; dedupe lock file after each update",
@@ -348,7 +357,7 @@
         "digest"
       ],
       "commitMessageTopic": "composer/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "github-actions: action/ prefix, strip org keeping only action name, include from/to versions and update type",
@@ -385,7 +394,7 @@
         "digest"
       ],
       "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run \u2014 skip stability window, bypass schedule, automerge on green CI, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. relaxed release-age behaviour because github-digest SHAs carry no releaseTimestamp \u2014 timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique \u2014 without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins.",
@@ -432,7 +441,7 @@
         "digest"
       ],
       "commitMessageTopic": "pip/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "pep621/uv: pip/ prefix, use resolved versions (always pinned), include update type",
@@ -459,7 +468,7 @@
         "digest"
       ],
       "commitMessageTopic": "pip/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "pre-commit hooks: hook/ prefix, strip org keeping only hook name, include from/to versions and update type; use currentValue/newValue (raw tag) since some repos use non-semver tags where currentVersion would be empty",
@@ -484,7 +493,7 @@
         "digest"
       ],
       "commitMessageTopic": "hook/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "bundler: gem/ prefix, from/to resolved versions and update type",
@@ -509,7 +518,7 @@
         "digest"
       ],
       "commitMessageTopic": "gem/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "docker-compose: docker/ prefix, strip org/registry keeping only image name, include from/to versions and update type",
@@ -534,7 +543,7 @@
         "digest"
       ],
       "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "cargo: rust/ prefix, use resolved versions, include update type; bump range lower bound to the new version rather than widening the constraint",
@@ -560,7 +569,7 @@
         "digest"
       ],
       "commitMessageTopic": "rust/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "gomod: go/ prefix, use resolved versions, include update type",
@@ -585,7 +594,7 @@
         "digest"
       ],
       "commitMessageTopic": "go/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "maven: maven/ prefix, use resolved versions, include update type",
@@ -610,7 +619,7 @@
         "digest"
       ],
       "commitMessageTopic": "maven/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "gradle/gradle-wrapper: gradle/ prefix, use resolved versions, include update type",
@@ -637,7 +646,7 @@
         "digest"
       ],
       "commitMessageTopic": "gradle/{{depName}}",
-      "commitMessageExtra": "(digest)"
+      "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
       "description": "nvm/.nvmrc/.node-version: node/ prefix, include from/to versions and update type",
