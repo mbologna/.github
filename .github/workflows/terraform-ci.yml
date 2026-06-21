@@ -187,7 +187,7 @@ jobs:
           output-file: README.md
           output-method: inject
           config-file: .terraform-docs.yml
-          git-push: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+          git-push: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]') }}
           fail-on-diff: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
           git-commit-message: "docs: auto-update README variables via terraform-docs [skip ci]"
 
