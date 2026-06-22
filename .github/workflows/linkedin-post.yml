@@ -1,0 +1,123 @@
+name: Post to LinkedIn
+
+on:
+  workflow_call:
+    inputs:
+      site_base_url:
+        description: Base URL of the site (e.g. https://www.example.com)
+        required: true
+        type: string
+      content_path_glob:
+        description: Glob pattern for new post files relative to repo root
+        required: false
+        type: string
+        default: "content/posts/[0-9]*/*.md"
+    secrets:
+      LINKEDIN_ACCESS_TOKEN:
+        required: true
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect new posts
+        id: detect
+        run: |
+          NEW_POSTS=$(git diff --name-only --diff-filter=A HEAD~1 HEAD -- '${{ inputs.content_path_glob }}')
+          echo "new_posts<<EOF" >> $GITHUB_OUTPUT
+          echo "$NEW_POSTS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post to LinkedIn
+        if: steps.detect.outputs.new_posts != ''
+        env:
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          NEW_POSTS: ${{ steps.detect.outputs.new_posts }}
+          SITE_BASE_URL: ${{ inputs.site_base_url }}
+        run: |
+          python3 << 'PYEOF'
+          import os, yaml, json, urllib.request, urllib.error, datetime
+
+          token = os.environ["LINKEDIN_ACCESS_TOKEN"]
+          base_url = os.environ["SITE_BASE_URL"].rstrip("/")
+          post_files = [f for f in os.environ["NEW_POSTS"].splitlines() if f.strip()]
+
+          # Get LinkedIn person URN
+          req = urllib.request.Request(
+              "https://api.linkedin.com/v2/me",
+              headers={"Authorization": f"Bearer {token}"}
+          )
+          with urllib.request.urlopen(req) as r:
+              person_id = json.loads(r.read())["id"]
+
+          for post_file in post_files:
+              with open(post_file) as f:
+                  content = f.read()
+
+              # Parse YAML frontmatter between --- delimiters
+              parts = content.split("---")
+              fm = yaml.safe_load(parts[1])
+
+              # Skip drafts
+              if fm.get("draft", False):
+                  print(f"Skipping draft: {post_file}")
+                  continue
+
+              # Skip future-dated posts
+              date = fm["date"]
+              year = str(date)[:4] if isinstance(date, str) else date.strftime("%Y")
+              post_date = datetime.date.fromisoformat(str(date)[:10])
+              if post_date > datetime.date.today():
+                  print(f"Skipping future-dated post ({post_date}): {post_file}")
+                  continue
+
+              title = fm["title"]
+              description = fm.get("description", "")
+              slug = fm["slug"]
+              tags = fm.get("tags", [])
+
+              url = f"{base_url}/{year}/{slug}/"
+              hashtags = " ".join(f"#{t.replace('-', '')}" for t in tags[:3])
+              body = f"{title}\n\n{description}\n\nRead more: {url}"
+              if hashtags:
+                  body += f"\n\n{hashtags}"
+
+              payload = json.dumps({
+                  "author": f"urn:li:person:{person_id}",
+                  "lifecycleState": "PUBLISHED",
+                  "specificContent": {
+                      "com.linkedin.ugc.ShareContent": {
+                          "shareCommentary": {"text": body},
+                          "shareMediaCategory": "ARTICLE",
+                          "media": [{
+                              "status": "READY",
+                              "originalUrl": url,
+                              "title": {"text": title},
+                              "description": {"text": description}
+                          }]
+                      }
+                  },
+                  "visibility": {
+                      "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+                  }
+              }).encode()
+
+              req = urllib.request.Request(
+                  "https://api.linkedin.com/v2/ugcPosts",
+                  data=payload,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "X-Restli-Protocol-Version": "2.0.0"
+                  }
+              )
+              with urllib.request.urlopen(req) as r:
+                  result = json.loads(r.read())
+                  print(f"Posted to LinkedIn: {result.get('id', result)}")
+          PYEOF
