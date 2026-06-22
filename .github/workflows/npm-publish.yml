@@ -42,6 +42,26 @@ jobs:
         if: inputs.package_manager == 'yarn'
         run: yarn --frozen-lockfile --non-interactive
 
+      - name: Sync package version to the release tag
+        # When triggered by a published Release, the auto-release workflow pushes the
+        # next tag (e.g. v1.2.3) without bumping package.json. Publishing the stale
+        # package.json version would collide with an already-published version and fail
+        # with HTTP 403. Deriving the version from the tag makes the tag the single
+        # source of truth and keeps npm in lock-step with GitHub releases. Guarded so
+        # non-release callers are unaffected; --allow-same-version keeps it idempotent.
+        if: github.event.release.tag_name != ''
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          echo "Release tag: ${TAG} -> version ${VERSION}"
+          if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+            yarn version --new-version "${VERSION}" --no-git-tag-version
+          else
+            npm version "${VERSION}" --no-git-tag-version --allow-same-version
+          fi
+
       - name: Lint
         run: ${{ inputs.package_manager }} run lint
         continue-on-error: true
