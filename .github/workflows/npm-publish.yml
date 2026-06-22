@@ -97,8 +97,9 @@ jobs:
             NODE_AUTH_TOKEN="${NPM_TOKEN}" npm publish --provenance --access public
           else
             echo "No NPM_TOKEN -> publishing via Trusted Publishing (OIDC)"
+            echo "OIDC request env present: ${ACTIONS_ID_TOKEN_REQUEST_URL:+yes}"
             if [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && [ -f "${NPM_CONFIG_USERCONFIG}" ]; then
               sed -i '/_authToken=/d' "${NPM_CONFIG_USERCONFIG}"
             fi
-            npm publish --access public
+            npm publish --access public --loglevel verbose
           fi
