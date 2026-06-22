@@ -78,10 +78,27 @@ jobs:
         continue-on-error: true
 
       - name: Publish to npm (Trusted Publishing OIDC, token fallback)
-        # npm authenticates via OIDC when a trusted publisher is configured on
-        # npmjs.com; otherwise it falls back to NODE_AUTH_TOKEN. --provenance is a
-        # no-op under OIDC (provenance is generated automatically) and still works
-        # with token auth, so it is safe to keep in both modes.
-        run: npm publish --provenance --access public
+        # Two supported auth modes:
+        #   1. Trusted Publishing (OIDC): no NPM_TOKEN secret. npm exchanges the
+        #      GitHub OIDC token for a short-lived publish token and also generates
+        #      provenance automatically (no --provenance flag needed).
+        #   2. Token fallback: NPM_TOKEN provided -> classic token auth.
+        # actions/setup-node always writes an `//registry/:_authToken=${NODE_AUTH_TOKEN}`
+        # line into the userconfig .npmrc. When the secret is empty that line becomes an
+        # empty token, which npm treats as "auth already configured" and SKIPS OIDC,
+        # failing with ENEEDAUTH. So in OIDC mode we strip that line first.
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "npm version: $(npm --version)"
+          if [ -n "${NPM_TOKEN:-}" ]; then
+            echo "NPM_TOKEN present -> publishing with token auth"
+            NODE_AUTH_TOKEN="${NPM_TOKEN}" npm publish --provenance --access public
+          else
+            echo "No NPM_TOKEN -> publishing via Trusted Publishing (OIDC)"
+            if [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && [ -f "${NPM_CONFIG_USERCONFIG}" ]; then
+              sed -i '/_authToken=/d' "${NPM_CONFIG_USERCONFIG}"
+            fi
+            npm publish --access public
+          fi
