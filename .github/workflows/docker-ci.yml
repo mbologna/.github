@@ -1,1 +1,366 @@
-test
+name: Docker CI
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: Docker image name (without registry prefix)
+        required: true
+        type: string
+      push_to_dockerhub:
+        description: Also push to Docker Hub (requires DOCKER_USERNAME / DOCKER_PASSWORD secrets)
+        required: false
+        type: boolean
+        default: true
+      platforms:
+        description: Comma-separated list of target platforms (informational; native runners are used per-platform)
+        required: false
+        type: string
+        default: linux/amd64,linux/arm64
+      enable_grype:
+        description: Run Grype vulnerability scanner in addition to Trivy
+        required: false
+        type: boolean
+        default: false
+      enable_cosign:
+        description: Sign images with Cosign (keyless / OIDC)
+        required: false
+        type: boolean
+        default: true
+      enable_integration_test:
+        description: Run scripts/integration-test.sh after build
+        required: false
+        type: boolean
+        default: false
+      enable_release_drafter:
+        description: Create a GitHub release on tag push
+        required: false
+        type: boolean
+        default: false
+      yamllint_paths:
+        description: Space-separated paths for yamllint to scan
+        required: false
+        type: string
+        default: .github/workflows/
+    outputs:
+      digest:
+        description: Built multi-arch image digest
+        value: ${{ jobs.merge.outputs.digest }}
+    secrets:
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Hadolint
+        uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error
+
+      - name: yamllint
+        uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3
+        with:
+          file_or_dir: ${{ inputs.yamllint_paths }}
+          config_data: |
+            extends: default
+            rules:
+              line-length:
+                max: 120
+                level: warning
+              truthy:
+                allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+              empty-lines:
+                max: 2
+                max-start: 0
+                max-end: 1
+              document-start: disable
+              new-line-at-end-of-file: disable
+
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    needs: lint
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+            cache_scope: linux-amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+            cache_scope: linux-arm64
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push (by digest)
+        id: build
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: type=gha,scope=${{ matrix.cache_scope }},mode=max
+          provenance: false
+          sbom: false
+
+      - name: Export digest
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: digest-${{ matrix.cache_scope }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge multi-arch manifest
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.merge.outputs.digest }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Download digests
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Login to Docker Hub
+        if: inputs.push_to_dockerhub
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
+        env:
+          DOCKERHUB_IMAGE: ${{ format('{0}/{1}', secrets.DOCKER_USERNAME, inputs.image_name) }}
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}
+            ${{ inputs.push_to_dockerhub && env.DOCKERHUB_IMAGE || '' }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Create multi-arch manifest and push tags
+        id: merge
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf 'ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@sha256:%s ' *)
+          SHORT_SHA="${GITHUB_SHA::7}"
+          DIGEST=$(docker buildx imagetools inspect \
+            "ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:sha-${SHORT_SHA}" \
+            --format '{{json .Manifest}}' | jq -r '.digest')
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ steps.merge.outputs.digest }}
+          format: cyclonedx-json
+          artifact-name: sbom-${{ inputs.image_name }}.cyclonedx.json
+
+  scan-trivy:
+    name: Security Scan (trivy)
+    runs-on: ubuntu-latest
+    needs: merge
+    if: github.event_name != 'pull_request'
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
+          format: sarif
+          output: trivy-results.sarif
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH,MEDIUM
+          timeout: 10m
+
+      - name: Upload Trivy SARIF
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+  scan-grype:
+    name: Security Scan (grype)
+    runs-on: ubuntu-latest
+    needs: merge
+    if: inputs.enable_grype && github.event_name != 'pull_request'
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Grype
+        continue-on-error: true
+        run: |
+          grype db update
+          grype "ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}" \
+            --output sarif > grype-results.sarif
+
+      - name: Upload Grype SARIF
+        if: always() && hashFiles('grype-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        with:
+          sarif_file: grype-results.sarif
+          category: grype
+
+  sign:
+    name: Sign Images
+    runs-on: ubuntu-latest
+    needs: merge
+    if: inputs.enable_cosign && github.event_name != 'pull_request'
+    permissions:
+      id-token: write
+      packages: write
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        if: inputs.push_to_dockerhub
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Sign GHCR image
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          cosign sign --yes \
+            "ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}"
+
+      - name: Sign Docker Hub image
+        if: inputs.push_to_dockerhub
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          cosign sign --yes \
+            "${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}"
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: merge
+    if: inputs.enable_integration_test && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run integration tests
+        env:
+          IMAGE_REF: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: bash scripts/integration-test.sh
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [merge, scan-trivy, scan-grype, sign]
+    if: inputs.enable_release_drafter && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Draft release notes
+        id: notes
+        uses: release-drafter/release-drafter@ed4bc48ec97379be2258e7b7ac2624a3e26ab809 # v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        with:
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          prerelease: false
+
