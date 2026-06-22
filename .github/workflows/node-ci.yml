@@ -38,6 +38,26 @@ on:
         required: false
         type: boolean
         default: false
+      build_command:
+        description: Command to build the project (runs after install, after CI passes)
+        required: false
+        type: string
+        default: ""
+      build_artifact_name:
+        description: Name for the uploaded build artifact
+        required: false
+        type: string
+        default: ""
+      build_artifact_path:
+        description: Path glob for files to upload as artifact (leave empty to skip upload)
+        required: false
+        type: string
+        default: ""
+      build_artifact_retention_days:
+        description: Number of days to retain the build artifact
+        required: false
+        type: number
+        default: 30
 
 jobs:
   ci:
@@ -71,6 +91,40 @@ jobs:
       - name: Test
         if: inputs.test_command != ''
         run: ${{ inputs.package_manager }} run ${{ inputs.test_command }}
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [ci]
+    if: inputs.build_command != ''
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Install dependencies (npm)
+        if: inputs.package_manager == 'npm'
+        run: npm install
+
+      - name: Install dependencies (yarn)
+        if: inputs.package_manager == 'yarn'
+        run: yarn --frozen-lockfile --non-interactive
+
+      - name: Build
+        run: ${{ inputs.build_command }}
+
+      - name: Upload artifact
+        if: inputs.build_artifact_path != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ inputs.build_artifact_name != '' && inputs.build_artifact_name || 'build' }}
+          path: ${{ inputs.build_artifact_path }}
+          retention-days: ${{ inputs.build_artifact_retention_days }}
 
   audit:
     name: npm audit
