@@ -14,8 +14,11 @@ on:
         type: string
         default: npm
     secrets:
+      # Optional: only used as a fallback when npm Trusted Publishing (OIDC) is not
+      # configured for the package on npmjs.com. With Trusted Publishing enabled the
+      # npm CLI authenticates via short-lived OIDC tokens and no secret is needed.
       NPM_TOKEN:
-        required: true
+        required: false
 
 jobs:
   publish:
@@ -33,6 +36,14 @@ jobs:
           node-version: ${{ inputs.node_version }}
           registry-url: https://registry.npmjs.org
           cache: ${{ inputs.package_manager }}
+
+      - name: Upgrade npm for Trusted Publishing (OIDC) support
+        # npm Trusted Publishing (OIDC) requires npm >= 11.5.1. Node LTS still ships
+        # npm 10.x, so upgrade explicitly. The npm CLI auto-detects the OIDC
+        # environment and uses it before falling back to NODE_AUTH_TOKEN, so this is
+        # safe whether or not a trusted publisher is configured yet.
+        if: inputs.package_manager == 'npm'
+        run: npm install -g npm@latest
 
       - name: Install dependencies (npm)
         if: inputs.package_manager == 'npm'
@@ -66,7 +77,11 @@ jobs:
         run: ${{ inputs.package_manager }} run lint
         continue-on-error: true
 
-      - name: Publish to npm (with provenance)
+      - name: Publish to npm (Trusted Publishing OIDC, token fallback)
+        # npm authenticates via OIDC when a trusted publisher is configured on
+        # npmjs.com; otherwise it falls back to NODE_AUTH_TOKEN. --provenance is a
+        # no-op under OIDC (provenance is generated automatically) and still works
+        # with token auth, so it is safe to keep in both modes.
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
