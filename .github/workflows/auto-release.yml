@@ -48,15 +48,18 @@ jobs:
             VERSION="${{ steps.latest.outputs.tag }}"
             VERSION="${VERSION#v}"
 
-            TAGGED=$(curl -sf "https://hub.docker.com/v2/repositories/${REPO}/tags/${VERSION}" \
+            TAGGED=$(curl -s "https://hub.docker.com/v2/repositories/${REPO}/tags/${VERSION}" \
               | jq -r '.digest // empty')
-            LATEST=$(curl -sf "https://hub.docker.com/v2/repositories/${REPO}/tags/latest" \
+            LATEST=$(curl -s "https://hub.docker.com/v2/repositories/${REPO}/tags/latest" \
               | jq -r '.digest // empty')
 
             echo "Tagged (${VERSION}) digest : ${TAGGED:-not found}"
             echo "Latest              digest : ${LATEST:-not found}"
 
-            if [ -n "$TAGGED" ] && [ -n "$LATEST" ] && [ "$TAGGED" != "$LATEST" ]; then
+            # Release if: latest exists AND (version tag was never published OR digests differ).
+            # A missing version tag means the CI run that should have published it failed,
+            # so latest already contains newer content.
+            if [ -n "$LATEST" ] && { [ -z "$TAGGED" ] || [ "$TAGGED" != "$LATEST" ]; }; then
               NEEDED=true
             fi
 
