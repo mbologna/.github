@@ -166,21 +166,34 @@ jobs:
 
       - name: Determine commit range
         id: range
+        env:
+          GH_TOKEN: ${{ github.token }}
         # release-drafter (previous approach) only lists merged PRs, so repos that
         # push commits directly to main (no PR) always got an empty "No changes"
         # changelog. Compute the range since the last semver tag instead, so the
         # changelog step below can walk raw commits regardless of PR history.
+        #
+        # The baseline is the last tag with an actual *published* GitHub Release —
+        # not just the last git tag. auto-release.yml pushes a tag every time it
+        # finds new commits, but this release job only runs when `ci` (needs: [ci])
+        # succeeds; if CI ever fails on a given tag, that tag never gets released.
+        # Anchoring to the last git tag would then silently drop that tag's commits
+        # from every future changelog. Anchoring to the last released tag makes the
+        # very next successful run absorb the missed commits instead.
         run: |
           set -euo pipefail
           CURRENT_TAG="${GITHUB_REF_NAME}"
-          PREV_TAG=$(git tag --list 'v*.*.*' --sort=-version:refname \
-            | awk -v cur="$CURRENT_TAG" 'found{print; exit} $0==cur{found=1}')
-          if [ -n "$PREV_TAG" ]; then
+          PREV_TAG=$(gh release list --repo "${GITHUB_REPOSITORY}" \
+            --exclude-drafts --exclude-pre-releases --limit 200 \
+            --json tagName,publishedAt \
+            | jq -r --arg cur "$CURRENT_TAG" \
+              '[.[] | select(.tagName != $cur)] | sort_by(.publishedAt) | last.tagName // empty')
+          if [ -n "$PREV_TAG" ] && git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
             RANGE="${PREV_TAG}..${CURRENT_TAG}"
           else
             RANGE="${CURRENT_TAG}"
           fi
-          echo "Previous tag: ${PREV_TAG:-<none, first release>}"
+          echo "Last released tag: ${PREV_TAG:-<none, first release>}"
           echo "Range: ${RANGE}"
           echo "current_tag=${CURRENT_TAG}" >> "$GITHUB_OUTPUT"
           echo "range=${RANGE}" >> "$GITHUB_OUTPUT"

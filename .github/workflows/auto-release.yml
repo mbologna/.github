@@ -71,16 +71,38 @@ jobs:
 
           echo "needed=${NEEDED}" >> "$GITHUB_OUTPUT"
 
-      - name: Compute next patch version
+      - name: Compute next version
         id: next
         if: steps.check.outputs.needed == 'true'
+        # For the "commits" strategy, bump type follows Conventional Commits: any
+        # "type!:" subject or "BREAKING CHANGE:" footer since the last tag -> major;
+        # any "feat:" -> minor; otherwise patch. The "docker" strategy has no commit
+        # history to classify (it compares image digests), so it always stays patch.
         run: |
+          set -euo pipefail
           TAG="${{ steps.latest.outputs.tag }}"
           VER="${TAG#v}"
           MAJOR=$(echo "$VER" | cut -d. -f1)
           MINOR=$(echo "$VER" | cut -d. -f2)
           PATCH=$(echo "$VER" | cut -d. -f3)
-          NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+
+          BUMP="patch"
+          if [ "${{ inputs.strategy }}" = "commits" ]; then
+            COMMITS=$(git log "${TAG}..HEAD" --format='%s%n%b' --no-merges)
+            if echo "$COMMITS" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:|^BREAKING CHANGE:'; then
+              BUMP="major"
+            elif echo "$COMMITS" | grep -qE '^feat(\([^)]*\))?:'; then
+              BUMP="minor"
+            fi
+          fi
+
+          case "$BUMP" in
+            major) NEW_TAG="v$((MAJOR + 1)).0.0" ;;
+            minor) NEW_TAG="v${MAJOR}.$((MINOR + 1)).0" ;;
+            patch) NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+          esac
+
+          echo "Bump type: ${BUMP}"
           echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
           echo "Next tag: ${NEW_TAG}"
 
