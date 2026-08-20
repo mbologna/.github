@@ -203,6 +203,11 @@ jobs:
         # auto-release.yml were never turned into GitHub releases, so they must not
         # act as changelog section boundaries — the whole range collapses into one
         # section labelled by --tag below instead.
+        #
+        # chore(deps) commits are skipped (not just grouped) — they're Renovate
+        # automerge noise (digest bumps, lockfile maintenance) with no reader value
+        # on a release page. Plain "chore:" commits (human-authored) still show
+        # under Chores.
         run: |
           cat > cliff.toml <<'EOF'
           [changelog]
@@ -237,7 +242,7 @@ jobs:
             { message = "^ci", group = "CI/CD" },
             { message = "^build", group = "Build" },
             { message = "^revert", group = "Reverts" },
-            { message = "^chore\\(deps\\)", group = "Dependency Updates" },
+            { message = "^chore\\(deps\\)", skip = true },
             { message = "^chore", group = "Chores" },
             { message = "^style", group = "Styling" },
             { message = "^polish", group = "Polish" },
