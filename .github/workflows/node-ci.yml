@@ -164,15 +164,84 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Draft release notes
-        id: notes
-        uses: release-drafter/release-drafter@34d80673e067bdc0c24568d3af899c216adcfaa9 # v7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Determine commit range
+        id: range
+        # release-drafter (previous approach) only lists merged PRs, so repos that
+        # push commits directly to main (no PR) always got an empty "No changes"
+        # changelog. Compute the range since the last semver tag instead, so the
+        # changelog step below can walk raw commits regardless of PR history.
+        run: |
+          set -euo pipefail
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          PREV_TAG=$(git tag --list 'v*.*.*' --sort=-version:refname \
+            | awk -v cur="$CURRENT_TAG" 'found{print; exit} $0==cur{found=1}')
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..${CURRENT_TAG}"
+          else
+            RANGE="${CURRENT_TAG}"
+          fi
+          echo "Previous tag: ${PREV_TAG:-<none, first release>}"
+          echo "Range: ${RANGE}"
+          echo "current_tag=${CURRENT_TAG}" >> "$GITHUB_OUTPUT"
+          echo "range=${RANGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Write changelog config
+        # tag_pattern is deliberately unmatchable: intermediate tags pushed weekly by
+        # auto-release.yml were never turned into GitHub releases, so they must not
+        # act as changelog section boundaries — the whole range collapses into one
+        # section labelled by --tag below instead.
+        run: |
+          cat > cliff.toml <<'EOF'
+          [changelog]
+          header = ""
+          body = """
+          {% for group, commits in commits | group_by(attribute="group") %}
+          ### {{ group | upper_first }}
+          {% for commit in commits %}
+          - {{ commit.message | split(pat="\n") | first | trim }} ({{ commit.id | truncate(length=7, end="") }})
+          {% endfor %}
+          {% endfor %}
+          """
+          footer = ""
+          trim = true
+
+          [git]
+          conventional_commits = true
+          filter_unconventional = false
+          split_commits = false
+          protect_breaking_commits = false
+          filter_commits = false
+          tag_pattern = "^$"
+          topo_order = false
+          sort_commits = "oldest"
+          commit_parsers = [
+            { message = "^feat", group = "Features" },
+            { message = "^fix", group = "Bug Fixes" },
+            { message = "^perf", group = "Performance" },
+            { message = "^refactor", group = "Refactor" },
+            { message = "^docs", group = "Documentation" },
+            { message = "^test", group = "Testing" },
+            { message = "^ci", group = "CI/CD" },
+            { message = "^build", group = "Build" },
+            { message = "^revert", group = "Reverts" },
+            { message = "^chore\\(deps\\)", group = "Dependency Updates" },
+            { message = "^chore", group = "Chores" },
+            { message = "^style", group = "Styling" },
+            { message = "^polish", group = "Polish" },
+            { message = ".*", group = "Other Changes" },
+          ]
+          EOF
+
+      - name: Generate changelog
+        id: changelog
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4.8.0
+        with:
+          config: cliff.toml
+          args: --tag ${{ steps.range.outputs.current_tag }} ${{ steps.range.outputs.range }}
 
       - name: Create release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
-          body: ${{ steps.notes.outputs.body }}
+          body: ${{ steps.changelog.outputs.content }}
           draft: false
           prerelease: false
