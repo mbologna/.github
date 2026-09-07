@@ -82,7 +82,7 @@
         "major"
       ],
       "minimumReleaseAge": "30 days",
-      "labels": [
+      "addLabels": [
         "major"
       ],
       "automerge": false,
@@ -129,8 +129,11 @@
       ]
     },
     {
-      "description": "Security-categorised packages (e.g. cryptography, openssl \u2014 any update, not just CVE-triggered): fix(security): prefix, bypass age gate and schedule, jump queue with prPriority 10, automerge on green CI. Settings intentionally mirror vulnerabilityAlerts so both paths get the same urgency; prPriority is the only setting not covered there. 1-minute floor (not 0 days) + relaxed for the same reason as vulnerabilityAlerts: 0 days normalises to null, no check is posted, automerge is blocked on repos without CI.",
+      "description": "Security-categorised packages (e.g. cryptography, openssl \u2014 any update, not just CVE-triggered): security label, fix(security): prefix, bypass age gate and schedule, jump queue with prPriority 10, automerge on green CI. Settings intentionally mirror vulnerabilityAlerts so both paths get the same urgency; prPriority is the only setting not covered there. 1-minute floor (not 0 days) + relaxed for the same reason as vulnerabilityAlerts: 0 days normalises to null, no check is posted, automerge is blocked on repos without CI.",
       "matchCategories": [
+        "security"
+      ],
+      "addLabels": [
         "security"
       ],
       "commitMessagePrefix": "fix(security):",
