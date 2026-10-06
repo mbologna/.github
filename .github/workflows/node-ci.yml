@@ -33,6 +33,11 @@ on:
         required: false
         type: string
         default: moderate
+      audit_omit_dev:
+        description: Audit production dependencies only (npm audit --omit=dev). For packages whose devDependencies never ship, e.g. CSS-only themes
+        required: false
+        type: boolean
+        default: false
       enable_release_drafter:
         description: Create a GitHub release on tag push
         required: false
@@ -150,7 +155,7 @@ jobs:
         run: yarn --frozen-lockfile --non-interactive
 
       - name: Audit
-        run: npm audit --audit-level=${{ inputs.audit_level }}
+        run: npm audit --audit-level=${{ inputs.audit_level }}${{ inputs.audit_omit_dev && ' --omit=dev' || '' }}
 
   release:
     name: Release
