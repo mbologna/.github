@@ -1,0 +1,34 @@
+# Shared hadolint job for GitLab projects under mbologna.
+#
+# Only elevates DL3006 (no tag) and DL3007 (:latest) to error-level failures via an
+# inline override config - everything else stays at hadolint's own default
+# severity, so pre-existing unrelated warnings (apt/apk pin-version, CMD JSON
+# notation, non-numeric user ids, ...) don't suddenly start failing CI as a side
+# effect of adding this. The override is written inline rather than fetched
+# remotely to avoid the raw.githubusercontent.com / include:remote: caching lag
+# this project has already hit elsewhere (see .gitlab/auto-release.yml history).
+#
+# Caller sets HADOLINT_DOCKERFILE if its Dockerfile isn't at the repo root (e.g. a
+# monorepo subdirectory, or a non-default filename).
+#
+# Include via:
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/mbologna/.github/main/.gitlab/hadolint.yml'
+
+hadolint:
+  stage: check
+  image: hadolint/hadolint@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27
+  variables:
+    HADOLINT_DOCKERFILE: Dockerfile
+  script:
+    - |
+      cat > .hadolint.yaml << 'CONFIG'
+      override:
+        error:
+          - DL3006
+          - DL3007
+      CONFIG
+    - hadolint --config .hadolint.yaml --failure-threshold error "$HADOLINT_DOCKERFILE"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
