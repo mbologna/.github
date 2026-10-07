@@ -7,9 +7,13 @@
 #     - remote: 'https://raw.githubusercontent.com/mbologna/.github/main/.gitlab/auto-release.yml'
 #
 # Caller sets AUTO_RELEASE_STRATEGY ("docker" or "commits") as a job/global variable.
-# GITLAB_API_TOKEN (already present in these projects for other registry/API calls) is
-# needed by "docker" strategy to read the project's own container registry, and always
-# to create the GitLab Release object described below.
+# Needs a token with api + write_repository scope to push the tag and create the
+# Release (and, for "docker" strategy, to read the project's own container registry).
+# Defaults to $RENOVATE_TOKEN (already present in every project for the shared
+# renovate.yml job, and already proven to have the right scope - Renovate itself
+# pushes branches/MRs with it). Override per-job if a project uses a different
+# variable name for this (e.g. thelounge-patched, which has no RENOVATE_TOKEN and
+# sets `variables: AUTO_RELEASE_TOKEN: "${GITLAB_API_TOKEN}"` instead).
 #
 # No semver tag found yet -> silently skips (push an initial vX.Y.Z tag manually once
 # to bootstrap, same bootstrap requirement as the GitHub Actions version).
@@ -27,6 +31,7 @@ auto-release:
   variables:
     GIT_STRATEGY: clone
     GIT_DEPTH: 0
+    AUTO_RELEASE_TOKEN: "${RENOVATE_TOKEN}"
   before_script:
     - apk add --no-cache git curl jq
   script:
@@ -43,12 +48,12 @@ auto-release:
       NEEDED=false
       if [ "$AUTO_RELEASE_STRATEGY" = "docker" ]; then
         VERSION="${LATEST_TAG#v}"
-        REPO_ID=$(curl -sf --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+        REPO_ID=$(curl -sf --header "PRIVATE-TOKEN: ${AUTO_RELEASE_TOKEN}" \
           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/registry/repositories" | jq -r '.[0].id')
-        TAGGED=$(curl -sf --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+        TAGGED=$(curl -sf --header "PRIVATE-TOKEN: ${AUTO_RELEASE_TOKEN}" \
           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/registry/repositories/${REPO_ID}/tags/${VERSION}" \
           | jq -r '.digest // empty' 2>/dev/null || true)
-        LATEST=$(curl -sf --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+        LATEST=$(curl -sf --header "PRIVATE-TOKEN: ${AUTO_RELEASE_TOKEN}" \
           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/registry/repositories/${REPO_ID}/tags/latest" \
           | jq -r '.digest // empty')
         echo "Tagged (${VERSION}) digest : ${TAGGED:-not found}"
@@ -100,7 +105,7 @@ auto-release:
       git config user.name "auto-release"
       git config user.email "auto-release@noreply.mbologna.dev"
       git tag "$NEW_TAG"
-      git push "https://oauth2:${GITLAB_API_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$NEW_TAG"
+      git push "https://oauth2:${AUTO_RELEASE_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$NEW_TAG"
       echo "Released: ${NEW_TAG}"
 
       # Real GitLab Release object (visible in the Releases UI), not just a lightweight
@@ -130,7 +135,7 @@ auto-release:
         fi
       fi
 
-      curl -sf --request POST --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+      curl -sf --request POST --header "PRIVATE-TOKEN: ${AUTO_RELEASE_TOKEN}" \
         --form "tag_name=${NEW_TAG}" \
         --form "description=<${NOTES_FILE}" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases" > /dev/null
