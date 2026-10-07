@@ -66,6 +66,11 @@ jobs:
         with:
           dockerfile: Dockerfile
           failure-threshold: error
+          # DL3006 (no tag) / DL3007 (:latest) stay warning-level by default, which
+          # this failure-threshold ignores. Force them to error so unpinned/:latest
+          # base images actually fail CI; everything else keeps today's severity so
+          # unrelated pre-existing warnings don't start failing as a side effect.
+          override-error: DL3006,DL3007
 
       - name: yamllint
         uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3
