@@ -1,0 +1,98 @@
+# Shared auto-release job for GitLab projects under mbologna.
+#
+# GitLab-CI port of .github/workflows/auto-release.yml (same two strategies, same
+# version-bump rules), for repos with no GitHub Actions equivalent. Include via:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/mbologna/.github/main/.gitlab/auto-release.yml'
+#
+# Caller sets AUTO_RELEASE_STRATEGY ("docker" or "commits") as a job/global variable.
+# "docker" also needs GITLAB_API_TOKEN (already present in these projects for other
+# registry/API calls) to read the project's own container registry via the GitLab API.
+#
+# No semver tag found yet -> silently skips (push an initial vX.Y.Z tag manually once
+# to bootstrap, same bootstrap requirement as the GitHub Actions version).
+
+auto-release:
+  stage: release
+  image: alpine/git:2.47.2
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 0
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - |
+      set -euo pipefail
+      git fetch --tags -q
+      LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
+      if [ -z "$LATEST_TAG" ]; then
+        echo "No semver tag found - push an initial vX.Y.Z tag manually to bootstrap. Skipping."
+        exit 0
+      fi
+      echo "Latest tag: $LATEST_TAG"
+
+      NEEDED=false
+      if [ "$AUTO_RELEASE_STRATEGY" = "docker" ]; then
+        VERSION="${LATEST_TAG#v}"
+        REPO_ID=$(curl -sf --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/registry/repositories" | jq -r '.[0].id')
+        TAGGED=$(curl -sf --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/registry/repositories/${REPO_ID}/tags/${VERSION}" \
+          | jq -r '.digest // empty' 2>/dev/null || true)
+        LATEST=$(curl -sf --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/registry/repositories/${REPO_ID}/tags/latest" \
+          | jq -r '.digest // empty')
+        echo "Tagged (${VERSION}) digest : ${TAGGED:-not found}"
+        echo "Latest              digest : ${LATEST:-not found}"
+        if [ -n "$LATEST" ] && { [ -z "$TAGGED" ] || [ "$TAGGED" != "$LATEST" ]; }; then
+          NEEDED=true
+        fi
+      elif [ "$AUTO_RELEASE_STRATEGY" = "commits" ]; then
+        COUNT=$(git log "${LATEST_TAG}..HEAD" --oneline | wc -l | tr -d ' ')
+        echo "Commits since ${LATEST_TAG}: ${COUNT}"
+        [ "$COUNT" -gt 0 ] && NEEDED=true
+      else
+        echo "Unknown AUTO_RELEASE_STRATEGY: ${AUTO_RELEASE_STRATEGY:-<unset>}" >&2
+        exit 1
+      fi
+
+      if [ "$NEEDED" != "true" ]; then
+        echo "No release needed."
+        exit 0
+      fi
+
+      # Bump type: commits strategy classifies via Conventional Commits (type!:/BREAKING
+      # CHANGE: -> major, feat: -> minor, else patch). docker strategy has no commit range
+      # to classify (digest diff only), so it always stays patch - same rule as the GitHub
+      # Actions auto-release.yml.
+      VER="${LATEST_TAG#v}"
+      MAJOR=$(echo "$VER" | cut -d. -f1)
+      MINOR=$(echo "$VER" | cut -d. -f2)
+      PATCH=$(echo "$VER" | cut -d. -f3)
+
+      BUMP="patch"
+      if [ "$AUTO_RELEASE_STRATEGY" = "commits" ]; then
+        COMMITS=$(git log "${LATEST_TAG}..HEAD" --format='%s%n%b' --no-merges)
+        if echo "$COMMITS" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:|^BREAKING CHANGE:'; then
+          BUMP="major"
+        elif echo "$COMMITS" | grep -qE '^feat(\([^)]*\))?:'; then
+          BUMP="minor"
+        fi
+      fi
+
+      case "$BUMP" in
+        major) NEW_TAG="v$((MAJOR + 1)).0.0" ;;
+        minor) NEW_TAG="v${MAJOR}.$((MINOR + 1)).0" ;;
+        patch) NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+      esac
+      echo "Bump type: ${BUMP}"
+      echo "Next tag: ${NEW_TAG}"
+
+      git config user.name "auto-release"
+      git config user.email "auto-release@noreply.mbologna.dev"
+      git tag "$NEW_TAG"
+      git push "https://oauth2:${GITLAB_API_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$NEW_TAG"
+      echo "Released: ${NEW_TAG}"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

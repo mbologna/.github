@@ -1,0 +1,26 @@
+# Shared Renovate job for GitLab projects under mbologna.
+#
+# This exact block was previously hand-copied verbatim across every GitLab repo (with
+# version drift between copies). Centralized here, included via:
+#
+#   include:
+#     - remote: 'https://raw.githubusercontent.com/mbologna/.github/main/.gitlab/renovate.yml'
+#
+# Requires CI/CD variables RENOVATE_TOKEN, GITHUB_COM_TOKEN (already present in every
+# project using this), and a pipeline schedule with RENOVATE_RUN=true set as a schedule
+# variable (the rule below only fires on scheduled pipelines, matching every existing
+# per-repo copy of this job).
+
+renovate:
+  stage: .pre
+  image: renovate/renovate:44.132.5
+  variables:
+    RENOVATE_PLATFORM: gitlab
+    RENOVATE_ENDPOINT: $CI_SERVER_URL/api/v4
+    RENOVATE_TOKEN: $RENOVATE_TOKEN
+    GITHUB_COM_TOKEN: $GITHUB_COM_TOKEN
+    LOG_LEVEL: info
+  script:
+    - renovate $CI_PROJECT_PATH
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $RENOVATE_RUN == "true"
