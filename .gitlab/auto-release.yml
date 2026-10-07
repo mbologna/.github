@@ -7,11 +7,19 @@
 #     - remote: 'https://raw.githubusercontent.com/mbologna/.github/main/.gitlab/auto-release.yml'
 #
 # Caller sets AUTO_RELEASE_STRATEGY ("docker" or "commits") as a job/global variable.
-# "docker" also needs GITLAB_API_TOKEN (already present in these projects for other
-# registry/API calls) to read the project's own container registry via the GitLab API.
+# GITLAB_API_TOKEN (already present in these projects for other registry/API calls) is
+# needed by "docker" strategy to read the project's own container registry, and always
+# to create the GitLab Release object described below.
 #
 # No semver tag found yet -> silently skips (push an initial vX.Y.Z tag manually once
 # to bootstrap, same bootstrap requirement as the GitHub Actions version).
+#
+# Every actual release also creates a real GitLab Release object (not just a
+# lightweight tag), with changelog notes from the commit subjects since the last tag.
+# Optionally set AUTO_RELEASE_BASE_IMAGE_PATTERN to an egrep pattern matching your own
+# Dockerfile's ARG/LABEL lines (for repos that repackage a specific upstream base
+# image) to also surface that in the release notes on every release, not just ones
+# that changed it.
 
 auto-release:
   stage: release
@@ -94,5 +102,39 @@ auto-release:
       git tag "$NEW_TAG"
       git push "https://oauth2:${GITLAB_API_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git" "$NEW_TAG"
       echo "Released: ${NEW_TAG}"
+
+      # Real GitLab Release object (visible in the Releases UI), not just a lightweight
+      # tag. commits strategy: changelog is the commit subjects since the last tag -
+      # this already surfaces upstream base-tag bumps for free, since that's exactly
+      # what Renovate's own commit messages describe. docker strategy: no commit range
+      # to summarize (the trigger is a digest diff, not a commit), so note the new
+      # digest instead.
+      NOTES_FILE=$(mktemp)
+      git log "${LATEST_TAG}..HEAD" --format='- %s' --no-merges > "$NOTES_FILE"
+      if [ "$AUTO_RELEASE_STRATEGY" = "docker" ] && [ -n "${LATEST:-}" ]; then
+        { echo "Upstream digest changed: ${LATEST}"; echo; cat "$NOTES_FILE"; } > "${NOTES_FILE}.new"
+        mv "${NOTES_FILE}.new" "$NOTES_FILE"
+      fi
+      [ -s "$NOTES_FILE" ] || echo "(no commit messages since ${LATEST_TAG})" > "$NOTES_FILE"
+
+      # Optional, opt-in: surface the current upstream base-image reference on every
+      # release, not just releases that happened to change it. Caller sets
+      # AUTO_RELEASE_BASE_IMAGE_PATTERN to an egrep pattern matching its own
+      # ARG/LABEL lines (e.g. the ARG lines that pin a repackaged base image) - same
+      # source of truth the Dockerfile itself uses, so this can't drift out of sync.
+      if [ -n "${AUTO_RELEASE_BASE_IMAGE_PATTERN:-}" ] && [ -f Dockerfile ]; then
+        BASE_IMAGE_INFO=$(grep -E "$AUTO_RELEASE_BASE_IMAGE_PATTERN" Dockerfile || true)
+        if [ -n "$BASE_IMAGE_INFO" ]; then
+          { echo "Base image:"; echo '```'; echo "$BASE_IMAGE_INFO"; echo '```'; echo; cat "$NOTES_FILE"; } > "${NOTES_FILE}.new"
+          mv "${NOTES_FILE}.new" "$NOTES_FILE"
+        fi
+      fi
+
+      curl -sf --request POST --header "PRIVATE-TOKEN: ${GITLAB_API_TOKEN}" \
+        --form "tag_name=${NEW_TAG}" \
+        --form "description=<${NOTES_FILE}" \
+        "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/releases" > /dev/null
+      rm -f "$NOTES_FILE"
+      echo "Created GitLab Release for ${NEW_TAG}"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
