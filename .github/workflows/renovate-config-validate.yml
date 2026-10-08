@@ -1,0 +1,76 @@
+name: Validate Renovate preset
+
+# renovate-config.json is the update policy for every repo in this account, and
+# nothing used to check it. On 2026-10-08 Renovate 44 dropped transitiveRemediation,
+# renamed the regex manager to custom.regex, and started rejecting rangeStrategy
+# next to matchUpdateTypes — the preset went invalid and every consuming repo was
+# affected in the same hour, with no signal anywhere until a run was read by hand.
+#
+# Validated against renovate@latest ON PURPOSE, not a pinned version. The fastest-
+# moving consumer of this preset is Mend's hosted app on GitHub, which upgrades
+# itself; a preset valid only against an older Renovate is already broken there.
+# The weekly schedule is the point: a Renovate release that invalidates the preset
+# turns a scheduled run red instead of silently breaking every repo.
+#
+# Note the opposite trap, documented in the infra repo's pre-commit hook: when
+# validating a config written for a NEWER Renovate, an unpinned validator that
+# resolves an OLDER version reports confident nonsense. Here newer is exactly what
+# we want to be warned about, so latest is correct. Do not "fix" a failure by
+# pinning this backwards — fix the preset.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - renovate-config.json
+      - renovate.json
+      - .github/workflows/renovate-config-validate.yml
+  pull_request:
+    paths:
+      - renovate-config.json
+      - renovate.json
+      - .github/workflows/renovate-config-validate.yml
+  schedule:
+    # Mondays 05:00 UTC, an hour before the 06:00 auto-release run that gives
+    # Renovate its week of work.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: renovate-config-validator
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Validate the preset and this repo's own config
+        run: |
+          set -uo pipefail
+          # Both files by name: a bare invocation only auto-discovers
+          # renovate.json, which here is the one-line extend, leaving the preset
+          # itself unchecked.
+          #
+          # --no-global is required. Without it the validator treats named files
+          # as global self-hosted config and applies the wrong schema, which
+          # passes things a repo config would reject.
+          #
+          # Errors fail, warnings do not. The validator exits non-zero for both,
+          # so the exit code alone cannot tell "the preset is broken" from "an
+          # option is deprecated"; only the former should block. Deprecations
+          # stay visible as an annotation on every run.
+          out=$(npx --yes --package renovate renovate-config-validator \
+            --no-global renovate-config.json renovate.json 2>&1 \
+            | grep -vE "^npm (notice|warn)") || true
+          printf '%s\n' "$out"
+          if grep -q '"errors":' <<<"$out"; then
+            echo "::error::Renovate preset has configuration errors — see the log above."
+            exit 1
+          fi
+          if grep -q '"warnings":' <<<"$out"; then
+            echo "::warning::Renovate preset is valid but raised warnings — see the log above."
+          fi
+          echo "preset validated"
