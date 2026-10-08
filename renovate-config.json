@@ -30,14 +30,14 @@
     "dependencies"
   ],
   "vulnerabilityAlerts": {
-    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): add security label, fix(security): prefix, bypass age gate and schedule, automerge on green CI. 1-minute floor (not 0 days) ensures Renovate posts a stability check \u2014 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses which blocks automerge on repos without CI. relaxed behaviour because CVE fix packages may lack a releaseTimestamp.",
+    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): add security label, fix(security): prefix, bypass age gate and schedule, automerge on green CI. 1-minute floor (not 0 days) ensures Renovate posts a stability check \u2014 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses which blocks automerge on repos without CI. timestamp-optional because CVE fix packages may lack a releaseTimestamp.",
     "labels": [
       "dependencies",
       "security"
     ],
     "commitMessagePrefix": "fix(security):",
     "minimumReleaseAge": "1 minute",
-    "minimumReleaseAgeBehaviour": "relaxed",
+    "minimumReleaseAgeBehaviour": "timestamp-optional",
     "schedule": [
       "at any time"
     ],
@@ -63,7 +63,7 @@
       "before 9am on monday"
     ],
     "minimumReleaseAge": "1 minute",
-    "minimumReleaseAgeBehaviour": "relaxed"
+    "minimumReleaseAgeBehaviour": "timestamp-optional"
   },
   "customManagers": [
     {
@@ -84,12 +84,12 @@
   ],
   "packageRules": [
     {
-      "description": "Lockfile-only (transitive) updates: automerge on green CI. 1-minute floor + relaxed ensures Renovate posts a stability check \u2014 transitive deps may lack releaseTimestamp so timestamp-required would block automerge forever.",
+      "description": "Lockfile-only (transitive) updates: automerge on green CI. 1-minute floor + timestamp-optional ensures Renovate posts a stability check \u2014 transitive deps may lack releaseTimestamp so timestamp-required would block automerge forever.",
       "matchUpdateTypes": [
         "lockFileUpdate"
       ],
       "minimumReleaseAge": "1 minute",
-      "minimumReleaseAgeBehaviour": "relaxed",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
       "automerge": true
     },
     {
@@ -116,13 +116,13 @@
       "automerge": true
     },
     {
-      "description": "Digest and pinDigest updates: 1-minute floor forces Renovate to post a stability check. 0 days normalises to null internally (no check posted = branch stays pending forever on repos without CI). relaxed behaviour required because digest SHAs (GitHub Actions, Docker, etc.) carry no releaseTimestamp \u2014 with the default 'require' behaviour the check would stay PENDING forever regardless of how many times Renovate runs. internalChecksAsSuccess handles repos without CI.",
+      "description": "Digest and pinDigest updates: 1-minute floor forces Renovate to post a stability check. 0 days normalises to null internally (no check posted = branch stays pending forever on repos without CI). timestamp-optional required because digest SHAs (GitHub Actions, Docker, etc.) carry no releaseTimestamp \u2014 with the default 'require' behaviour the check would stay PENDING forever regardless of how many times Renovate runs. internalChecksAsSuccess handles repos without CI.",
       "matchUpdateTypes": [
         "digest",
         "pinDigest"
       ],
       "minimumReleaseAge": "1 minute",
-      "minimumReleaseAgeBehaviour": "relaxed",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
       "automerge": true,
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
@@ -145,7 +145,7 @@
       ]
     },
     {
-      "description": "Security-categorised packages (e.g. cryptography, openssl \u2014 any update, not just CVE-triggered): security label, fix(security): prefix, bypass age gate and schedule, jump queue with prPriority 10, automerge on green CI. Settings intentionally mirror vulnerabilityAlerts so both paths get the same urgency; prPriority is the only setting not covered there. 1-minute floor (not 0 days) + relaxed for the same reason as vulnerabilityAlerts: 0 days normalises to null, no check is posted, automerge is blocked on repos without CI.",
+      "description": "Security-categorised packages (e.g. cryptography, openssl \u2014 any update, not just CVE-triggered): security label, fix(security): prefix, bypass age gate and schedule, jump queue with prPriority 10, automerge on green CI. Settings intentionally mirror vulnerabilityAlerts so both paths get the same urgency; prPriority is the only setting not covered there. 1-minute floor (not 0 days) + timestamp-optional for the same reason as vulnerabilityAlerts: 0 days normalises to null, no check is posted, automerge is blocked on repos without CI.",
       "matchCategories": [
         "security"
       ],
@@ -154,7 +154,7 @@
       ],
       "commitMessagePrefix": "fix(security):",
       "minimumReleaseAge": "1 minute",
-      "minimumReleaseAgeBehaviour": "relaxed",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
       "prPriority": 10,
       "automerge": true,
       "reviewers": [],
@@ -420,7 +420,7 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
-      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run \u2014 skip stability window, bypass schedule, automerge on green CI, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. relaxed release-age behaviour because github-digest SHAs carry no releaseTimestamp \u2014 timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique \u2014 without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins.",
+      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run \u2014 skip stability window, bypass schedule, automerge on green CI, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. timestamp-optional release-age behaviour because github-digest SHAs carry no releaseTimestamp \u2014 timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique \u2014 without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins.",
       "matchManagers": [
         "github-actions"
       ],
@@ -428,7 +428,7 @@
         "mbologna/.github"
       ],
       "minimumReleaseAge": "1 minute",
-      "minimumReleaseAgeBehaviour": "relaxed",
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
       "schedule": [
         "at any time"
       ],
