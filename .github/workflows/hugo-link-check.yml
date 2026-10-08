@@ -7,7 +7,7 @@ on:
         description: Hugo version to use
         required: false
         type: string
-        default: '0.161.1'
+        default: '0.166.0'
       fail_on_broken:
         description: Fail the job if broken links are found
         required: false
