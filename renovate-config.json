@@ -20,7 +20,7 @@
   "automergeStrategy": "squash",
   "separateMultipleMajor": true,
   "internalChecksAsSuccess": true,
-  "prTitle": "{{commitMessagePrefix}} {{commitMessageAction}} {{commitMessageTopic}}{{#if isLockfileUpdate}} (lockfile){{else}} {{commitMessageExtra}}{{/if}}{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}} [automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}} [automerge]{{else if isLockfileUpdate}} [automerge]{{else if isMajor}}{{else}} [automerge]{{/if}}",
+  "commitMessageSuffix": "{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}}[automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}[automerge]{{else if isLockfileUpdate}}[automerge]{{else if isMajor}}{{else}}[automerge]{{/if}}",
   "prBodyNotes": [
     "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
   ],
@@ -84,13 +84,14 @@
   ],
   "packageRules": [
     {
-      "description": "Lockfile-only (transitive) updates: automerge on green CI. 1-minute floor + timestamp-optional ensures Renovate posts a stability check \u2014 transitive deps may lack releaseTimestamp so timestamp-required would block automerge forever.",
+      "description": "Lockfile-only (transitive) updates: automerge on green CI. 1-minute floor + timestamp-optional ensures Renovate posts a stability check \u2014 transitive deps may lack releaseTimestamp so timestamp-required would block automerge forever. commitMessageExtra prints (lockfile) where a version bump shows from/to, replacing the isLockfileUpdate branch of the prTitle template that did this before prTitle was deprecated.",
       "matchUpdateTypes": [
         "lockFileUpdate"
       ],
       "minimumReleaseAge": "1 minute",
       "minimumReleaseAgeBehaviour": "timestamp-optional",
-      "automerge": true
+      "automerge": true,
+      "commitMessageExtra": "(lockfile)"
     },
     {
       "description": "Major updates: hold 30 days to let the ecosystem surface breaking changes and incompatibilities, then assign for manual review \u2014 no auto-merge",
