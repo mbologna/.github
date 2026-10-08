@@ -19,7 +19,6 @@
   "platformAutomerge": false,
   "automergeStrategy": "squash",
   "separateMultipleMajor": true,
-  "transitiveRemediation": true,
   "internalChecksAsSuccess": true,
   "prTitle": "{{commitMessagePrefix}} {{commitMessageAction}} {{commitMessageTopic}}{{#if isLockfileUpdate}} (lockfile){{else}} {{commitMessageExtra}}{{/if}}{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}} [automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}} [automerge]{{else if isLockfileUpdate}} [automerge]{{else if isMajor}}{{else}} [automerge]{{/if}}",
   "prBodyNotes": [
@@ -169,7 +168,6 @@
     {
       "description": "Regex-managed versions: one PR per package; include from/to versions and update type",
       "matchManagers": [
-        "regex",
         "custom.regex"
       ],
       "matchUpdateTypes": [
@@ -185,7 +183,6 @@
     {
       "description": "Regex-managed digest updates: no extra info in commit message \u2014 digest is self-explanatory",
       "matchManagers": [
-        "regex",
         "custom.regex"
       ],
       "matchUpdateTypes": [
@@ -198,7 +195,6 @@
     {
       "description": "Regex-managed helm charts: add helm/ prefix, overrides topic from both version and digest regex rules above \u2014 commitMessageExtra is inherited from whichever of those matched first",
       "matchManagers": [
-        "regex",
         "custom.regex"
       ],
       "matchDatasources": [
@@ -284,6 +280,16 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
+      "description": "Bump the range lower bound to the new version rather than widening the constraint. Kept in its own rule because Renovate rejects rangeStrategy together with matchUpdateTypes (the range strategy is decided before the update type is known).",
+      "matchManagers": [
+        "terraform",
+        "npm",
+        "composer",
+        "cargo"
+      ],
+      "rangeStrategy": "bump"
+    },
+    {
       "description": "terraform: terraform/ prefix, use resolved versions not constraint strings, include update type; bump range lower bound to the new version rather than widening the constraint; currentVersion is absent for lockfile-only updates so make the 'from' clause conditional",
       "matchManagers": [
         "terraform"
@@ -296,8 +302,7 @@
         "lockFileMaintenance"
       ],
       "commitMessageTopic": "terraform/{{depName}}",
-      "commitMessageExtra": "{{#if currentVersion}}from {{currentVersion}} to {{/if}}{{newVersion}} ({{updateType}})",
-      "rangeStrategy": "bump"
+      "commitMessageExtra": "{{#if currentVersion}}from {{currentVersion}} to {{/if}}{{newVersion}} ({{updateType}})"
     },
     {
       "description": "terraform digest: no extra info in commit message",
@@ -348,7 +353,6 @@
       ],
       "commitMessageTopic": "npm/{{depName}}",
       "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})",
-      "rangeStrategy": "bump",
       "postUpdateOptions": [
         "npmDedupe"
       ]
@@ -365,8 +369,7 @@
         "pin"
       ],
       "commitMessageTopic": "composer/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})",
-      "rangeStrategy": "bump"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "composer digest: no extra info in commit message",
@@ -577,8 +580,7 @@
         "pin"
       ],
       "commitMessageTopic": "rust/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})",
-      "rangeStrategy": "bump"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "cargo digest: no extra info in commit message",
