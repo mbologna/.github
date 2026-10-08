@@ -66,6 +66,23 @@
     "minimumReleaseAge": "1 minute",
     "minimumReleaseAgeBehaviour": "relaxed"
   },
+  "customManagers": [
+    {
+      "description": "Hugo version passed to the reusable Hugo workflows (hugo_version: input in callers, default: under the hugo_version input here). The hugo-version: input of peaceiris/actions-hugo is already handled by the built-in github-actions manager with the same depName, so every Hugo pin lands in one PR.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/workflows/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "hugo_version:\\s*['\"]?(?<currentValue>\\d+\\.\\d+\\.\\d+)['\"]?",
+        "hugo_version:\\n(?:[ \\t]+.*\\n){0,4}?[ \\t]+default:\\s*['\"]?(?<currentValue>\\d+\\.\\d+\\.\\d+)['\"]?"
+      ],
+      "depNameTemplate": "hugo",
+      "packageNameTemplate": "gohugoio/hugo",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    }
+  ],
   "packageRules": [
     {
       "description": "Lockfile-only (transitive) updates: automerge on green CI. 1-minute floor + relaxed ensures Renovate posts a stability check \u2014 transitive deps may lack releaseTimestamp so timestamp-required would block automerge forever.",
@@ -664,6 +681,19 @@
       ],
       "commitMessageTopic": "node/{{depName}}",
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo), never auto-merged because it changes workflows and can break the site build; the PR build of the caller repo shows whether the new version works. MUST be last so it overrides the regex and github-actions rules above.",
+      "matchPackageNames": [
+        "gohugoio/hugo"
+      ],
+      "groupName": "hugo",
+      "commitMessageTopic": "hugo",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})",
+      "automerge": false,
+      "reviewers": [
+        "mbologna"
+      ]
     }
   ]
 }
