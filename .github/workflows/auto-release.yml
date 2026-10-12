@@ -17,8 +17,11 @@ jobs:
   auto-release:
     name: Auto Release (${{ inputs.strategy }})
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    # No permissions block: the job takes what the caller's job grants, which
+    # must be `contents: write` (push the tag) and `actions: write` (dispatch the
+    # tag build). Declaring actions: write here would make every caller that
+    # doesn't grant it fail at startup on its next pin bump; inheriting it
+    # instead confines the failure to the "Build the tag" step.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -114,3 +117,22 @@ jobs:
           git tag "${{ steps.next.outputs.new_tag }}"
           git push origin "${{ steps.next.outputs.new_tag }}"
           echo "Released: ${{ steps.next.outputs.new_tag }}"
+
+      # A tag pushed with GITHUB_TOKEN never triggers the caller's `push: tags`
+      # run (GitHub's anti-recursion rule), so without this the tag exists but
+      # no image or release is ever built for it. workflow_dispatch is the one
+      # event GITHUB_TOKEN may trigger. The caller must grant `actions: write`
+      # and list `workflow_dispatch` in its `on:`.
+      - name: Build the tag
+        if: steps.next.outputs.new_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # In a called workflow, github.workflow_ref is the caller's:
+          # owner/repo/.github/workflows/ci.yml@refs/heads/main
+          CALLER: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          WORKFLOW="${CALLER%@*}"
+          WORKFLOW="${WORKFLOW##*/}"
+          gh workflow run "$WORKFLOW" --repo "${{ github.repository }}" --ref "${{ steps.next.outputs.new_tag }}"
+          echo "Dispatched ${WORKFLOW} on ${{ steps.next.outputs.new_tag }}"
