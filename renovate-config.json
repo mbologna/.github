@@ -54,6 +54,11 @@
   "pre-commit": {
     "pinDigests": false
   },
+  "terraform": {
+    "lockFileMaintenance": {
+      "enabled": false
+    }
+  },
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true,
@@ -260,9 +265,15 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
+      "description": "terraform: move only the lock file for in-range updates and leave the constraint alone (out-of-range majors still rewrite it). With bump, the constraint PR set the lock to its own age-gated newVersion and downgraded providers that lock file maintenance had already moved further (k3s-oci #186, oci 9.9.0 -> 9.8.0). Lock file maintenance is off for terraform (see the terraform manager block), so every provider version passes the age gates. Kept in its own rule because Renovate rejects rangeStrategy together with matchUpdateTypes (the range strategy is decided before the update type is known).",
+      "matchManagers": [
+        "terraform"
+      ],
+      "rangeStrategy": "update-lockfile"
+    },
+    {
       "description": "Bump the range lower bound to the new version rather than widening the constraint. Kept in its own rule because Renovate rejects rangeStrategy together with matchUpdateTypes (the range strategy is decided before the update type is known).",
       "matchManagers": [
-        "terraform",
         "npm",
         "composer",
         "cargo"
@@ -270,7 +281,7 @@
       "rangeStrategy": "bump"
     },
     {
-      "description": "terraform: terraform/ prefix, use resolved versions not constraint strings, include update type; bump range lower bound to the new version rather than widening the constraint; currentVersion is absent for lockfile-only updates so make the 'from' clause conditional",
+      "description": "terraform: terraform/ prefix, use resolved versions not constraint strings, include update type; currentVersion is absent for lockfile-only updates so make the 'from' clause conditional",
       "matchManagers": [
         "terraform"
       ],
