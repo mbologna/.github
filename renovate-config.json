@@ -676,7 +676,7 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo), never auto-merged because it changes workflows and can break the site build; the PR build of the caller repo shows whether the new version works. MUST be last so it overrides the regex and github-actions rules above.",
+      "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo), never auto-merged because it changes workflows and can break the site build; the PR build of the caller repo shows whether the new version works. MUST be last so it overrides the regex and github-actions rules above. The empty commitMessageSuffix drops the [automerge] title tag, which the top-level template derives from update type, not from this rule's automerge: false.",
       "matchPackageNames": [
         "gohugoio/hugo"
       ],
@@ -686,7 +686,8 @@
       "automerge": false,
       "reviewers": [
         "mbologna"
-      ]
+      ],
+      "commitMessageSuffix": ""
     }
   ]
 }
