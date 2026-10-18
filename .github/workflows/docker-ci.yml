@@ -37,6 +37,14 @@ on:
         required: false
         type: boolean
         default: false
+      extra_tags:
+        description: >-
+          Extra docker/metadata-action tag rules, one per line, appended to the
+          defaults (e.g. type=raw,value=4.5.2,enable={{is_default_branch}} for an
+          image whose version comes from its base image rather than a git tag)
+        required: false
+        type: string
+        default: ""
       yamllint_paths:
         description: Space-separated paths for yamllint to scan
         required: false
@@ -205,6 +213,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            ${{ inputs.extra_tags }}
 
       - name: Create multi-arch manifest and push tags
         id: merge
