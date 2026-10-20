@@ -70,6 +70,16 @@
     "minimumReleaseAge": "1 minute",
     "minimumReleaseAgeBehaviour": "timestamp-optional"
   },
+  "customDatasources": {
+    "dockerhub-suffix": {
+      "description": "Docker Hub tags for images with more than 1,000 tags, where the docker datasource loses every release timestamp (see the packageRules that use it). One page, newest first, filtered to tags containing the pinned tag's suffix (3.12-alpine -> name=-alpine, 28-dind -> name=-dind), so the variants that matter are on it. Carries the per-tag digest: Renovate takes newDigest from the release, so tag@digest pins keep working, including same-tag digest updates. packageName is the Docker Hub repository (library/python).",
+      "defaultRegistryUrlTemplate": "https://hub.docker.com/v2/repositories/{{packageName}}/tags?ordering=last_updated&page_size=100&name={{replace '^v?[0-9][0-9.]*' '' currentValue}}",
+      "format": "json",
+      "transformTemplates": [
+        "{\"releases\": [results.({\"version\": name, \"releaseTimestamp\": $substring(last_updated, 0, 19) & \"Z\", \"digest\": $type(digest) = 'string' ? digest})]}"
+      ]
+    }
+  },
   "customManagers": [
     {
       "description": "Hugo version passed to the reusable Hugo workflows (hugo_version: input in callers, default: under the hugo_version input here). The hugo-version: input of peaceiris/actions-hugo is already handled by the built-in github-actions manager with the same depName, so every Hugo pin lands in one PR.",
@@ -674,6 +684,138 @@
       ],
       "commitMessageTopic": "node/{{depName}}",
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "renovate/renovate image: prefix PR title with docker/. Changelog disabled — Renovate releases many times per day; fetching 10+ release notes from GitHub API hangs the runner. Its release dates come from GitHub releases, see the Docker Hub lookup rules below.",
+      "matchDepNames": [
+        "renovate/renovate"
+      ],
+      "commitMessageTopic": "docker/renovate",
+      "fetchChangeLogs": "off"
+    },
+    {
+      "description": "Docker Hub images with >1,000 tags, part 1. Docker Hub's tags API returns 403 past page 10; Renovate then drops the Docker Hub data for the whole image and falls back to the registry tag list, which has no timestamps, so every update sat in Pending Status Checks forever (2026-10-13). timestamp-optional would turn the age gate off, so look the versions up where the dates are. Keep these rules after every rule that matches matchDatasources docker (repo-level rules come after the preset's, so a repo rule matching docker would not see these images). renovate/renovate: GitHub releases have the same versions (tags without a v) with dates. Not npm, Renovate's documented overrideDatasource example: npm releases carry their integrity hash as newDigest, and the kubernetes manager writes any newDigest into the image, whatever pinDigests says, so 06898c5d pinned renovate/renovate:44.132.2@sha512-…, which no registry can pull (renovate-20261016-131513.log).",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchDepNames": [
+        "renovate/renovate"
+      ],
+      "overrideDatasource": "github-releases",
+      "overridePackageName": "renovatebot/renovate"
+    },
+    {
+      "description": "Docker Hub images with >1,000 tags, part 2 (fixed version tags): GitHub releases have the same versions with dates and full history. Docker Hub's newest 100 tags are nightlies for these, so the dockerhub-suffix datasource would miss stable releases. None of these is digest-pinned (github-releases digests are commit SHAs, not image digests).",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchDepNames": [
+        "amir20/dozzle"
+      ],
+      "overrideDatasource": "github-releases",
+      "overridePackageName": "amir20/dozzle"
+    },
+    {
+      "description": "Docker Hub images with >1,000 tags, part 3 (suffixed or floating tags, some tag@digest pinned): the custom dockerhub-suffix datasource. Their release date is the tag's last push, so a floating tag such as 3.15-alpine ages from its latest rebuild, the same as any smaller Docker Hub image. The Hub API wants namespace/name: strip docker.io/ and prefix official images with library/.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchDepNames": [
+        "python",
+        "docker.io/library/python",
+        "nginx",
+        "docker.io/library/nginx",
+        "docker",
+        "docker.io/library/docker",
+        "nginxinc/nginx-unprivileged",
+        "docker.io/nginxinc/nginx-unprivileged",
+        "catthehacker/ubuntu"
+      ],
+      "overrideDatasource": "custom.dockerhub-suffix",
+      "overridePackageName": "{{replace '^([^/]+)$' 'library/$1' (replace '^docker\\.io/' '' packageName)}}"
+    },
+    {
+      "description": "Date-less registries, part 1: ghcr.io, nvcr.io and data.forgejo.org give the docker datasource no release timestamps, so updates sat in Pending Status Checks forever (2026-10-13). ghcr.io images come from the GitHub repo of the same owner/name and are tagged like its releases; a future one whose repo differs fails its lookup loudly. Only two-level ghcr paths: deeper ones are OCI Helm charts with no such repo. Excluded: mbologna's images, digest-only pins. This part: vX.Y.Z pins.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "/^ghcr\\.io/[^/]+/[^/]+$/",
+        "!ghcr.io/mbologna/**"
+      ],
+      "matchCurrentValue": "/^v\\d/",
+      "overrideDatasource": "github-releases",
+      "overridePackageName": "{{replace '^ghcr\\.io/' '' packageName}}"
+    },
+    {
+      "description": "Date-less registries, part 2: ghcr.io pins tagged X.Y.Z (no v) while their GitHub releases are vX.Y.Z (e.g. ghcr.io/<owner>/<name>:1.2.3 from release v1.2.3).",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "/^ghcr\\.io/[^/]+/[^/]+$/",
+        "!ghcr.io/mbologna/**"
+      ],
+      "matchCurrentValue": "/^\\d/",
+      "overrideDatasource": "github-releases",
+      "overridePackageName": "{{replace '^ghcr\\.io/' '' packageName}}",
+      "extractVersion": "^v(?<version>.+)$"
+    },
+    {
+      "description": "Date-less registries, part 3: nvcr.io k8s-device-plugin from its GitHub releases (same vX.Y.Z tags).",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchDepNames": [
+        "nvcr.io/nvidia/k8s-device-plugin"
+      ],
+      "overrideDatasource": "github-releases",
+      "overridePackageName": "NVIDIA/k8s-device-plugin"
+    },
+    {
+      "description": "Date-less registries, part 4: the Forgejo runner image (data.forgejo.org) from its releases on code.forgejo.org, tagged vX.Y.Z for image X.Y.Z.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchDepNames": [
+        "data.forgejo.org/forgejo/runner"
+      ],
+      "overrideDatasource": "forgejo-releases",
+      "overridePackageName": "forgejo/runner",
+      "registryUrls": [
+        "https://code.forgejo.org"
+      ],
+      "extractVersion": "^v(?<version>.+)$"
+    },
+    {
+      "description": "Floating tags on custom.dockerhub-suffix (3.12-alpine, 1.29-alpine, 28-dind): Docker Hub's date for them is the latest rebuild, and official images rebuild every week or two, so the 14-day minor and 30-day major gates could never pass (python 3.15, docker 29-dind, nginx-unprivileged 1.31, 2026-10-13). A short gate still bounds the real age: a tag 3 days past its latest rebuild is at least 3 days old. Fixed tags (1.31.6-alpine) keep the normal gates. Must stay after the dockerhub-suffix override rules, which change the datasource it matches.",
+      "matchDatasources": [
+        "custom.dockerhub-suffix"
+      ],
+      "matchCurrentValue": "/^v?\\d+(\\.\\d+)?-/",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Any image published under mbologna/ (any registry, any depth, including future ones): an own build, not an external release, so no stability wait (1 minute, not 0 days: 0 days normalises to null, no stability status is posted and automerge blocks forever). Normal automerge window. timestamp-optional because registry.gitlab.com and ghcr.io have no tag timestamps, so the gate could never be met (2026-10-12).",
+      "matchPackageNames": [
+        "**/mbologna/**"
+      ],
+      "minimumReleaseAge": "1 minute",
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    {
+      "description": "kustomize release tags are kustomize/vX.Y.Z (the repo also tags api/, cmd/config/, kyaml/ modules). Without extractVersion no tag parses as a version and a kustomize version pinned from github-releases never gets an update.",
+      "matchDepNames": [
+        "kubernetes-sigs/kustomize"
+      ],
+      "extractVersion": "^kustomize/v(?<version>.+)$"
+    },
+    {
+      "description": "One PR for every OpenTofu pin: CI install steps and .opentofu-version files",
+      "matchDepNames": [
+        "opentofu/opentofu"
+      ],
+      "groupName": "opentofu"
     },
     {
       "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo), never auto-merged because it changes workflows and can break the site build; the PR build of the caller repo shows whether the new version works. MUST be last so it overrides the regex and github-actions rules above. The empty commitMessageSuffix drops the [automerge] title tag, which the top-level template derives from update type, not from this rule's automerge: false.",
