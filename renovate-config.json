@@ -22,7 +22,7 @@
   "internalChecksAsSuccess": true,
   "commitMessageSuffix": "{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}}[automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}[automerge]{{else if isLockfileUpdate}}[automerge]{{else if isMajor}}{{else if (equals updateType 'lockFileMaintenance')}}{{else}}[automerge]{{/if}}",
   "prBodyNotes": [
-    "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if (equals updateType 'lockFileMaintenance')}}No stability window: Renovate checks no release ages for lock-file maintenance, so this PR needs a manual merge.{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
+    "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if (equals updateType 'pin')}}{{else if (containsString packageName 'mbologna/')}}{{else if (equals updateType 'lockFileMaintenance')}}No stability window: Renovate checks no release ages for lock-file maintenance, so this PR needs a manual merge.{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
   ],
   "dependencyDashboardTitle": "\ud83e\udd16 Renovate Dependency Dashboard",
   "dependencyDashboardLabels": [
