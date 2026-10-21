@@ -126,7 +126,7 @@
       "automerge": true
     },
     {
-      "description": "Digest and pinDigest updates: 1-minute floor forces Renovate to post a stability check. 0 days normalises to null internally (no check posted = branch stays pending forever on repos without CI). timestamp-optional required because digest SHAs (GitHub Actions, Docker, etc.) carry no releaseTimestamp \u2014 with the default 'require' behaviour the check would stay PENDING forever regardless of how many times Renovate runs. internalChecksAsSuccess handles repos without CI.",
+      "description": "Digest and pinDigest updates: 1-minute floor forces Renovate to post a stability check. 0 days normalises to null internally (no check posted = branch stays pending forever on repos without CI). timestamp-optional required because a digest update's branch carries no releaseTimestamp (the lookup-level gate ages it against its tag's latest release where the datasource gives dates, but that date never reaches the branch) \u2014 with the default 'require' behaviour the branch stability check would stay PENDING forever regardless of how many times Renovate runs. internalChecksAsSuccess handles repos without CI.",
       "matchUpdateTypes": [
         "digest",
         "pinDigest"
@@ -135,6 +135,17 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional",
       "automerge": true,
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
+    },
+    {
+      "description": "Third-party image digests (base-image rebuilds): Renovate ages a digest update against its tag's latest push (lookup applyMinimumReleaseAgeToDigestUpdate), so a short gate works where the registry gives dates (Docker Hub via the docker datasource, custom.dockerhub-suffix); ghcr/quay digests have no date and still pass (timestamp-optional). 2 days stays below the weekly-or-slower rebuild cadence of official images. pinDigest stays at the 1-minute floor: pinning the digest already in use brings in nothing new.",
+      "matchDatasources": [
+        "docker",
+        "custom.dockerhub-suffix"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "minimumReleaseAge": "2 days"
     },
     {
       "description": "Minor updates: hold 14 days to let the community catch supply-chain attacks before auto-merging on green CI",
