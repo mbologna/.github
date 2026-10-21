@@ -756,9 +756,12 @@
       "overridePackageName": "{{replace '^([^/]+)$' 'library/$1' (replace '^docker\\.io/' '' packageName)}}"
     },
     {
-      "description": "Date-less registries, part 1: ghcr.io, nvcr.io and data.forgejo.org give the docker datasource no release timestamps, so updates sat in Pending Status Checks forever (2026-10-13). ghcr.io images come from the GitHub repo of the same owner/name and are tagged like its releases; a future one whose repo differs fails its lookup loudly. Only two-level ghcr paths: deeper ones are OCI Helm charts with no such repo. Excluded: mbologna's images, digest-only pins. This part: vX.Y.Z pins.",
+      "description": "Date-less registries, part 1: ghcr.io, nvcr.io and data.forgejo.org give the docker datasource no release timestamps, so updates sat in Pending Status Checks forever (2026-10-13). ghcr.io images come from the GitHub repo of the same owner/name and are tagged like its releases; a future one whose repo differs fails its lookup loudly. Only two-level ghcr paths: deeper ones are OCI Helm charts with no such repo. Excluded: mbologna's images, digest-only pins, and every tag@sha256 pin (matchJsonata, in parts 1-5): after an override the digest comes from the new datasource, a git commit SHA, which Renovate wrote into ghcr.io/astral-sh/uv:0.12.24@5411378... and broke the builds (2026-10-21); see the digest-pinned rule below. This part: vX.Y.Z pins.",
       "matchDatasources": [
         "docker"
+      ],
+      "matchJsonata": [
+        "$not($exists(currentDigest))"
       ],
       "matchPackageNames": [
         "/^ghcr\\.io/[^/]+/[^/]+$/",
@@ -769,9 +772,12 @@
       "overridePackageName": "{{replace '^ghcr\\.io/' '' packageName}}"
     },
     {
-      "description": "Date-less registries, part 2: ghcr.io pins tagged X.Y.Z (no v) while their GitHub releases are vX.Y.Z (e.g. ghcr.io/<owner>/<name>:1.2.3 from release v1.2.3).",
+      "description": "Date-less registries, part 2: ghcr.io pins tagged X.Y.Z, from GitHub releases tagged vX.Y.Z or X.Y.Z (the v is optional: astral-sh/uv tags 0.12.24, and a required v dropped every uv release).",
       "matchDatasources": [
         "docker"
+      ],
+      "matchJsonata": [
+        "$not($exists(currentDigest))"
       ],
       "matchPackageNames": [
         "/^ghcr\\.io/[^/]+/[^/]+$/",
@@ -780,12 +786,36 @@
       "matchCurrentValue": "/^\\d/",
       "overrideDatasource": "github-releases",
       "overridePackageName": "{{replace '^ghcr\\.io/' '' packageName}}",
-      "extractVersion": "^v(?<version>.+)$"
+      "extractVersion": "^v?(?<version>\\d.*)$"
+    },
+    {
+      "description": "Date-less registries, digest-pinned: ghcr.io tag@sha256 pins stay on the docker datasource (parts 1-5 skip them), which resolves real image digests but gives no release dates. A version bump therefore cannot be age-gated: it opens a PR for a person to review instead of sitting in Pending Status Checks unseen. Same-tag digest updates keep the digest rules.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "/^ghcr\\.io/[^/]+/[^/]+$/",
+        "!ghcr.io/mbologna/**"
+      ],
+      "matchJsonata": [
+        "$exists(currentDigest)"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "minimumReleaseAgeBehaviour": "timestamp-optional",
+      "automerge": false,
+      "commitMessageSuffix": ""
     },
     {
       "description": "Date-less registries, part 3: nvcr.io k8s-device-plugin from its GitHub releases (same vX.Y.Z tags).",
       "matchDatasources": [
         "docker"
+      ],
+      "matchJsonata": [
+        "$not($exists(currentDigest))"
       ],
       "matchDepNames": [
         "nvcr.io/nvidia/k8s-device-plugin"
@@ -797,6 +827,9 @@
       "description": "Date-less registries, part 4: the Forgejo runner image (data.forgejo.org) from its releases on code.forgejo.org, tagged vX.Y.Z for image X.Y.Z.",
       "matchDatasources": [
         "docker"
+      ],
+      "matchJsonata": [
+        "$not($exists(currentDigest))"
       ],
       "matchDepNames": [
         "data.forgejo.org/forgejo/runner"
@@ -812,6 +845,9 @@
       "description": "Date-less registries, part 5: codeberg.org images from their Forgejo releases (vX.Y.Z tag for image X.Y.Z); the codeberg registry gives the docker datasource no dates. Chart tags such as k8s-gateway-4.0.1 do not match extractVersion.",
       "matchDatasources": [
         "docker"
+      ],
+      "matchJsonata": [
+        "$not($exists(currentDigest))"
       ],
       "matchPackageNames": [
         "/^codeberg\\.org/[^/]+/[^/]+$/"
