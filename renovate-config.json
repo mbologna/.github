@@ -20,9 +20,9 @@
   "automergeStrategy": "squash",
   "separateMultipleMajor": true,
   "internalChecksAsSuccess": true,
-  "commitMessageSuffix": "{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}}[automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}[automerge]{{else if isLockfileUpdate}}[automerge]{{else if isMajor}}{{else}}[automerge]{{/if}}",
+  "commitMessageSuffix": "{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}}[automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}[automerge]{{else if isLockfileUpdate}}[automerge]{{else if isMajor}}{{else if (equals updateType 'lockFileMaintenance')}}{{else}}[automerge]{{/if}}",
   "prBodyNotes": [
-    "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
+    "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if (equals updateType 'lockFileMaintenance')}}No stability window: Renovate checks no release ages for lock-file maintenance, so this PR needs a manual merge.{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
   ],
   "dependencyDashboardTitle": "\ud83e\udd16 Renovate Dependency Dashboard",
   "dependencyDashboardLabels": [
@@ -60,8 +60,12 @@
     }
   },
   "lockFileMaintenance": {
+    "description": "Weekly refresh of every lock file to the newest versions the ranges allow, transitive ones included. Renovate checks no release ages for it, so it must not automerge: with automerge it merged unaged transitive releases within hours in every repo with a lock file (thelounge-plugin-apprise-push #55, #68, #76). A person merges it.",
     "enabled": true,
-    "automerge": true,
+    "automerge": false,
+    "reviewers": [
+      "mbologna"
+    ],
     "commitMessageAction": "maintain",
     "commitMessageTopic": "lock files",
     "schedule": [
