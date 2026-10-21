@@ -735,7 +735,7 @@
       "overridePackageName": "amir20/dozzle"
     },
     {
-      "description": "Docker Hub images with >1,000 tags, part 3 (suffixed or floating tags, some tag@digest pinned): the custom dockerhub-suffix datasource. Their release date is the tag's last push, so a floating tag such as 3.15-alpine ages from its latest rebuild, the same as any smaller Docker Hub image. The Hub API wants namespace/name: strip docker.io/ and prefix official images with library/.",
+      "description": "Docker Hub images with >1,000 tags, part 3 (suffixed or floating tags, some tag@digest pinned; python, nginx, docker, nginx-unprivileged, node, catthehacker/ubuntu): the custom dockerhub-suffix datasource. Their release date is the tag's last push, so a floating tag such as 3.15-alpine ages from its latest rebuild, the same as any smaller Docker Hub image. The Hub API wants namespace/name: strip docker.io/ and prefix official images with library/.",
       "matchDatasources": [
         "docker"
       ],
@@ -748,6 +748,8 @@
         "docker.io/library/docker",
         "nginxinc/nginx-unprivileged",
         "docker.io/nginxinc/nginx-unprivileged",
+        "node",
+        "docker.io/library/node",
         "catthehacker/ubuntu"
       ],
       "overrideDatasource": "custom.dockerhub-suffix",
