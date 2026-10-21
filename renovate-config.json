@@ -20,9 +20,9 @@
   "automergeStrategy": "squash",
   "separateMultipleMajor": true,
   "internalChecksAsSuccess": true,
-  "commitMessageSuffix": "{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}}[automerge]{{else if (equals manager 'github-actions')}}{{else if isMajor}}{{else if isVulnerabilityAlert}}[automerge]{{else if isLockfileUpdate}}[automerge]{{else if (equals updateType 'lockFileMaintenance')}}{{else if (equals updateType 'replacement')}}{{else if (equals updateType 'rollback')}}{{else}}[automerge]{{/if}}",
+  "commitMessageSuffix": "[manual review]",
   "prBodyNotes": [
-    "{{#if (equals commitMessageSuffix '')}}{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if (equals updateType 'pin')}}{{else if (containsString packageName 'mbologna/')}}{{else if (equals updateType 'lockFileMaintenance')}}npm and Poetry lock files (and uv.lock where the repo sets exclude-newer) resolve only releases at least 7 days old; other lock files are not age-gated. Manual merge.{{else if (equals updateType 'replacement')}}{{else if (equals updateType 'rollback')}}{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
+    "{{#if isVulnerabilityAlert}}\ud83d\udd12 **Security fix**: no stability window{{#if (or isMajor (equals manager 'github-actions'))}}, but {{#if isMajor}}it is a major update{{else}}GitHub Actions updates are never merged automatically{{/if}}, so it waits for a manual merge{{else}}; it automerges on green CI{{/if}}.{{else if (equals commitMessageSuffix '[automerge]')}}{{#if (containsString packageName 'mbologna/')}}{{else if isMinor}}\ud83d\udcc5 **Automerges** once its stability window has passed (14 days by default for a minor update).{{else if isPatch}}\ud83d\udcc5 **Automerges** once its stability window has passed (7 days by default for a patch).{{/if}}{{else if (equals updateType 'lockFileMaintenance')}}\ud83d\udc64 **Manual merge.** npm and Poetry lock files (and uv.lock where the repository sets exclude-newer) resolve only releases at least 7 days old; other lock files take whatever is newest.{{else if isMajor}}\ud83d\udc64 **Manual merge.** A major update: it waited 30 days for others to report breakage; read the release notes before merging.{{else if (and (equals manager 'pre-commit') (equals updateType 'digest'))}}\ud83d\udc64 **Manual merge.** The hook's release tag now points at a different commit, which is how a hijacked tag looks: find out why before merging.{{else if (equals manager 'github-actions')}}\ud83d\udc64 **Manual merge.** GitHub Actions updates run with this repository's permissions, so they are never merged automatically.{{else}}\ud83d\udc64 **Manual merge.** A rule in the Renovate config holds this update for review.{{/if}}"
   ],
   "dependencyDashboardTitle": "\ud83e\udd16 Renovate Dependency Dashboard",
   "dependencyDashboardLabels": [
@@ -30,7 +30,7 @@
     "dependencies"
   ],
   "vulnerabilityAlerts": {
-    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): add security label, fix(security): prefix, bypass age gate and schedule. No automerge setting here: Renovate applies this block as force, over every packageRule, so automerge: true overrode the never-automerge rule for GitHub Actions and the manual review of majors. Patch and minor fixes still automerge on green CI through the update-type rules. 1-minute floor (not 0 days) ensures Renovate posts a stability check \u2014 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses which blocks automerge on repos without CI. timestamp-optional because CVE fix packages may lack a releaseTimestamp.",
+    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): add security label, fix(security): prefix, bypass age gate and schedule. No automerge setting here: Renovate applies this block as force, over every packageRule, so automerge: true overrode the never-automerge rule for GitHub Actions and the manual review of majors. Patch and minor fixes still automerge on green CI through the update-type rules. 1-minute floor (not 0 days) ensures Renovate posts a stability check \u2014 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses which blocks automerge on repos without CI. timestamp-optional because CVE fix packages may lack a releaseTimestamp. commitMessageSuffix is a template only here: being force, this block would otherwise put Renovate's default [SECURITY] (or one fixed tag) on every CVE fix; the condition restates which fixes the update-type and GitHub Actions rules keep from automerging, the one place the preset has to.",
     "labels": [
       "dependencies",
       "security"
@@ -43,7 +43,8 @@
     ],
     "automergeSchedule": [
       "at any time"
-    ]
+    ],
+    "commitMessageSuffix": "{{#if (or isMajor (equals manager 'github-actions'))}}[manual review]{{else}}[automerge]{{/if}}"
   },
   "gomod": {
     "ignorePaths": [
@@ -71,7 +72,8 @@
       "before 9am on monday"
     ],
     "minimumReleaseAge": "7 days",
-    "minimumReleaseAgeBehaviour": "timestamp-optional"
+    "minimumReleaseAgeBehaviour": "timestamp-optional",
+    "commitMessageSuffix": "[manual review]"
   },
   "customDatasources": {
     "dockerhub-suffix": {
@@ -113,7 +115,8 @@
       "automerge": false,
       "reviewers": [
         "mbologna"
-      ]
+      ],
+      "commitMessageSuffix": "[manual review]"
     },
     {
       "description": "Patch and pin updates: hold 7 days to let the community catch supply-chain attacks before auto-merging on green CI",
@@ -122,7 +125,8 @@
         "pin"
       ],
       "minimumReleaseAge": "7 days",
-      "automerge": true
+      "automerge": true,
+      "commitMessageSuffix": "[automerge]"
     },
     {
       "description": "Digest and pinDigest updates: 1-minute floor forces Renovate to post a stability check. 0 days normalises to null internally (no check posted = branch stays pending forever on repos without CI). timestamp-optional required because a digest update's branch carries no releaseTimestamp (the lookup-level gate ages it against its tag's latest release where the datasource gives dates, but that date never reaches the branch) \u2014 with the default 'require' behaviour the branch stability check would stay PENDING forever regardless of how many times Renovate runs. internalChecksAsSuccess handles repos without CI.",
@@ -132,7 +136,8 @@
       ],
       "minimumReleaseAge": "1 minute",
       "minimumReleaseAgeBehaviour": "timestamp-optional",
-      "automerge": true
+      "automerge": true,
+      "commitMessageSuffix": "[automerge]"
     },
     {
       "description": "Third-party image digests (base-image rebuilds): Renovate ages a digest update against its tag's latest push (lookup applyMinimumReleaseAgeToDigestUpdate), so a short gate works where the registry gives dates (Docker Hub via the docker datasource, custom.dockerhub-suffix); ghcr/quay digests have no date and still pass (timestamp-optional). 2 days stays below the weekly-or-slower rebuild cadence of official images. pinDigest stays at the 1-minute floor: pinning the digest already in use brings in nothing new.",
@@ -151,7 +156,8 @@
         "minor"
       ],
       "minimumReleaseAge": "14 days",
-      "automerge": true
+      "automerge": true,
+      "commitMessageSuffix": "[automerge]"
     },
     {
       "description": "GitHub Actions: never auto-merge \u2014 workflow changes run with repo permissions and are a supply-chain risk",
@@ -161,7 +167,8 @@
       "automerge": false,
       "reviewers": [
         "mbologna"
-      ]
+      ],
+      "commitMessageSuffix": "[manual review]"
     },
     {
       "description": "Regex-managed versions: one PR per package; include from/to versions and update type",
@@ -376,7 +383,8 @@
         "at any time"
       ],
       "automerge": true,
-      "reviewers": []
+      "reviewers": [],
+      "commitMessageSuffix": "[automerge]"
     },
     {
       "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type",
@@ -437,7 +445,7 @@
       "reviewers": [
         "mbologna"
       ],
-      "commitMessageSuffix": ""
+      "commitMessageSuffix": "[manual review]"
     },
     {
       "description": "bundler: gem/ prefix, from/to resolved versions and update type",
@@ -668,7 +676,7 @@
       ],
       "minimumReleaseAgeBehaviour": "timestamp-optional",
       "automerge": false,
-      "commitMessageSuffix": ""
+      "commitMessageSuffix": "[manual review]"
     },
     {
       "description": "Date-less registries, part 3: nvcr.io k8s-device-plugin from its GitHub releases (same vX.Y.Z tags).",
@@ -763,7 +771,10 @@
       "reviewers": [
         "mbologna"
       ],
-      "commitMessageSuffix": ""
+      "commitMessageSuffix": "[manual review]"
     }
+  ],
+  "addLabels": [
+    "{{#if isVulnerabilityAlert}}{{#if (or isMajor (equals manager 'github-actions'))}}manual-review{{else}}automerge{{/if}}{{else if (equals commitMessageSuffix '[automerge]')}}automerge{{else}}manual-review{{/if}}"
   ]
 }
