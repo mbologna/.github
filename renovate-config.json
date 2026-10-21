@@ -416,6 +416,16 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
+      "description": "Version inputs of actions (tflint_version, node-version, ...) are plain versions extracted as depType uses-with; pinning them to a commit SHA cannot be written (Errored branch on Dependency Dashboard #4).",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepTypes": [
+        "uses-with"
+      ],
+      "pinDigests": false
+    },
+    {
       "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run \u2014 skip stability window, bypass schedule, automerge on green CI, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. timestamp-optional release-age behaviour because github-digest SHAs carry no releaseTimestamp \u2014 timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique \u2014 without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins.",
       "matchManagers": [
         "github-actions"
