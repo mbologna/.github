@@ -30,7 +30,7 @@
     "dependencies"
   ],
   "vulnerabilityAlerts": {
-    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): add security label, fix(security): prefix, bypass age gate and schedule, automerge on green CI. 1-minute floor (not 0 days) ensures Renovate posts a stability check \u2014 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses which blocks automerge on repos without CI. timestamp-optional because CVE fix packages may lack a releaseTimestamp.",
+    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): add security label, fix(security): prefix, bypass age gate and schedule. No automerge setting here: Renovate applies this block as force, over every packageRule, so automerge: true overrode the never-automerge rule for GitHub Actions and the manual review of majors. Patch and minor fixes still automerge on green CI through the update-type rules. 1-minute floor (not 0 days) ensures Renovate posts a stability check \u2014 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses which blocks automerge on repos without CI. timestamp-optional because CVE fix packages may lack a releaseTimestamp.",
     "labels": [
       "dependencies",
       "security"
@@ -43,8 +43,7 @@
     ],
     "automergeSchedule": [
       "at any time"
-    ],
-    "automerge": true
+    ]
   },
   "gomod": {
     "ignorePaths": [
