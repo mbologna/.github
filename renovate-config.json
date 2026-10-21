@@ -473,10 +473,10 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
-      "description": "pep621/uv: pip/ prefix, use resolved versions (always pinned), include update type",
+      "description": "pep621/poetry (pyproject.toml; pep621 also updates uv.lock, uv is not a Renovate manager): pip/ prefix, use resolved versions, include update type",
       "matchManagers": [
         "pep621",
-        "uv"
+        "poetry"
       ],
       "matchUpdateTypes": [
         "major",
@@ -488,10 +488,10 @@
       "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
-      "description": "pep621/uv digest: no extra info in commit message",
+      "description": "pep621/poetry digest: no extra info in commit message",
       "matchManagers": [
         "pep621",
-        "uv"
+        "poetry"
       ],
       "matchUpdateTypes": [
         "digest"
