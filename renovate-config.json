@@ -103,16 +103,6 @@
   ],
   "packageRules": [
     {
-      "description": "Lockfile-only (transitive) updates: automerge on green CI. 1-minute floor + timestamp-optional ensures Renovate posts a stability check \u2014 transitive deps may lack releaseTimestamp so timestamp-required would block automerge forever. commitMessageExtra prints (lockfile) where a version bump shows from/to, replacing the isLockfileUpdate branch of the prTitle template that did this before prTitle was deprecated.",
-      "matchUpdateTypes": [
-        "lockFileUpdate"
-      ],
-      "minimumReleaseAge": "1 minute",
-      "minimumReleaseAgeBehaviour": "timestamp-optional",
-      "automerge": true,
-      "commitMessageExtra": "(lockfile)"
-    },
-    {
       "description": "Major updates: hold 30 days to let the ecosystem surface breaking changes and incompatibilities, then assign for manual review \u2014 no auto-merge",
       "matchUpdateTypes": [
         "major"
