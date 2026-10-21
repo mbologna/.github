@@ -269,20 +269,11 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
-      "description": "terraform: move only the lock file for in-range updates and leave the constraint alone (out-of-range majors still rewrite it). With bump, the constraint PR set the lock to its own age-gated newVersion and downgraded providers that lock file maintenance had already moved further (k3s-oci #186, oci 9.9.0 -> 9.8.0). Lock file maintenance is off for terraform (see the terraform manager block), so every provider version passes the age gates. Kept in its own rule because Renovate rejects rangeStrategy together with matchUpdateTypes (the range strategy is decided before the update type is known).",
+      "description": "terraform: move only the lock file for in-range updates and leave the constraint alone (out-of-range majors still rewrite it). With bump, the constraint PR set the lock to its own age-gated newVersion and downgraded providers that lock file maintenance had already moved further (k3s-oci #186, oci 9.9.0 -> 9.8.0). An in-range lock update keeps its patch or minor update type (isLockfileUpdate is only a flag), so the age gates of those rules apply to it; lock file maintenance, which ages no provider, is off for terraform (see the terraform manager block). npm, composer and cargo need no such rule: the default rangeStrategy auto already resolves to update-lockfile for them and keeps their widen cases (peer dependencies, || ranges). The preset used to force bump on them, and bump takes its update candidates from the lowest version the range allows instead of the locked one, so it automerged downgrades below the lock (sunrise-sunset-calendar #129 and #140, phpstan 2.3.1 -> 2.3.0; thelounge-plugin-apprise-push #63, eslint 10.12.0 -> 10.11.0; thelounge-theme-chat #72, stylelint) and opened no-op 'from X to X' PRs. Kept in its own rule because Renovate rejects rangeStrategy together with matchUpdateTypes (the range strategy is decided before the update type is known).",
       "matchManagers": [
         "terraform"
       ],
       "rangeStrategy": "update-lockfile"
-    },
-    {
-      "description": "Bump the range lower bound to the new version rather than widening the constraint. Kept in its own rule because Renovate rejects rangeStrategy together with matchUpdateTypes (the range strategy is decided before the update type is known).",
-      "matchManagers": [
-        "npm",
-        "composer",
-        "cargo"
-      ],
-      "rangeStrategy": "bump"
     },
     {
       "description": "terraform: terraform/ prefix, use resolved versions not constraint strings, include update type; currentVersion is absent for lockfile-only updates so make the 'from' clause conditional",
@@ -353,7 +344,7 @@
       ]
     },
     {
-      "description": "composer: composer/ prefix, from/to resolved versions and update type; bump range lower bound to the new version rather than widening the constraint",
+      "description": "composer: composer/ prefix, from/to resolved versions and update type",
       "matchManagers": [
         "composer"
       ],
@@ -564,7 +555,7 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
-      "description": "cargo: rust/ prefix, use resolved versions, include update type; bump range lower bound to the new version rather than widening the constraint",
+      "description": "cargo: rust/ prefix, use resolved versions, include update type",
       "matchManagers": [
         "cargo"
       ],
