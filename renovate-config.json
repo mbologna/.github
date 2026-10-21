@@ -516,6 +516,20 @@
       "commitMessageExtra": "to {{newDigestShort}} (digest)"
     },
     {
+      "description": "A pre-commit digest update means a release tag now points at a different commit — the signature of a hijacked tag (tj-actions/changed-files), never routine. Review by hand.",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "mbologna"
+      ],
+      "commitMessageSuffix": ""
+    },
+    {
       "description": "bundler: gem/ prefix, from/to resolved versions and update type",
       "matchManagers": [
         "bundler"
