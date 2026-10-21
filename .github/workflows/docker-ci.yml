@@ -371,6 +371,11 @@ jobs:
           package: ${{ inputs.image_name }}
           keep-n-tagged: 5
           delete-untagged: true
+          # Concurrent runs push untagged per-arch digests that their merge job
+          # only tags minutes later; without an age floor this cleanup deleted
+          # them mid-run ("<image>@sha256:...: not found" on Renovate branches of
+          # thelounge-digest and toggl-insights, 2026-10). Applies to every rule.
+          older-than: 1 day
           delete-ghost-images: true
           delete-partial-images: true
           exclude-tags: latest,main
