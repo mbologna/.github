@@ -132,8 +132,7 @@
       ],
       "minimumReleaseAge": "1 minute",
       "minimumReleaseAgeBehaviour": "timestamp-optional",
-      "automerge": true,
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "automerge": true
     },
     {
       "description": "Third-party image digests (base-image rebuilds): Renovate ages a digest update against its tag's latest push (lookup applyMinimumReleaseAgeToDigestUpdate), so a short gate works where the registry gives dates (Docker Hub via the docker datasource, custom.dockerhub-suffix); ghcr/quay digests have no date and still pass (timestamp-optional). 2 days stays below the weekly-or-slower rebuild cadence of official images. pinDigest stays at the 1-minute floor: pinning the digest already in use brings in nothing new.",
@@ -188,8 +187,7 @@
         "digest"
       ],
       "groupName": null,
-      "commitMessageTopic": "{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageTopic": "{{depName}}"
     },
     {
       "description": "Regex-managed helm charts: add helm/ prefix, overrides topic from both version and digest regex rules above \u2014 commitMessageExtra is inherited from whichever of those matched first",
@@ -202,6 +200,16 @@
       "commitMessageTopic": "helm/{{depName}}"
     },
     {
+      "description": "Regex-managed container images: docker/ prefix and the bare image name, the same as images the kubernetes and dockerfile managers find.",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}"
+    },
+    {
       "description": "kubernetes images: docker/ prefix, strip org/registry path keeping only image name, include from/to versions and update type",
       "matchManagers": [
         "kubernetes"
@@ -210,21 +218,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
-    },
-    {
-      "description": "kubernetes images digest: no extra info in commit message",
-      "matchManagers": [
-        "kubernetes"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
       "description": "argocd: helm/ prefix, strip org/registry path keeping only chart name, include from/to versions and update type",
@@ -235,21 +233,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
-    },
-    {
-      "description": "argocd digest: no extra info in commit message",
-      "matchManagers": [
-        "argocd"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
       "description": "helmfile/helm-values: helm/ prefix, strip org/registry keeping only chart name, include from/to versions and update type",
@@ -261,22 +249,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
-    },
-    {
-      "description": "helmfile/helm-values digest: no extra info in commit message",
-      "matchManagers": [
-        "helmfile",
-        "helm-values"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "helm/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
       "description": "terraform: move only the lock file for in-range updates and leave the constraint alone (out-of-range majors still rewrite it). With bump, the constraint PR set the lock to its own age-gated newVersion and downgraded providers that lock file maintenance had already moved further (k3s-oci #186, oci 9.9.0 -> 9.8.0). An in-range lock update keeps its patch or minor update type (isLockfileUpdate is only a flag), so the age gates of those rules apply to it; lock file maintenance, which ages no provider, is off for terraform (see the terraform manager block). npm, composer and cargo need no such rule: the default rangeStrategy auto already resolves to update-lockfile for them and keeps their widen cases (peer dependencies, || ranges). The preset used to force bump on them, and bump takes its update candidates from the lowest version the range allows instead of the locked one, so it automerged downgrades below the lock (sunrise-sunset-calendar #129 and #140, phpstan 2.3.1 -> 2.3.0; thelounge-plugin-apprise-push #63, eslint 10.12.0 -> 10.11.0; thelounge-theme-chat #72, stylelint) and opened no-op 'from X to X' PRs. Kept in its own rule because Renovate rejects rangeStrategy together with matchUpdateTypes (the range strategy is decided before the update type is known).",
@@ -295,21 +272,11 @@
         "minor",
         "patch",
         "pin",
-        "lockFileMaintenance"
-      ],
-      "commitMessageTopic": "terraform/{{depName}}",
-      "commitMessageExtra": "{{#if currentVersion}}from {{currentVersion}} to {{/if}}{{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "terraform digest: no extra info in commit message",
-      "matchManagers": [
-        "terraform"
-      ],
-      "matchUpdateTypes": [
+        "lockFileMaintenance",
         "digest"
       ],
       "commitMessageTopic": "terraform/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "{{#if currentVersion}}from {{currentVersion}} to {{/if}}{{newVersion}} ({{updateType}})"
     },
     {
       "description": "dockerfile: docker/ prefix, strip org/registry path keeping only image name, include from/to versions and update type",
@@ -320,21 +287,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
-    },
-    {
-      "description": "dockerfile digest: no extra info in commit message",
-      "matchManagers": [
-        "dockerfile"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
       "description": "npm: add npm/ prefix, use resolved versions not constraint strings, include update type; dedupe lock file after each update",
@@ -362,21 +319,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "composer/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "composer digest: no extra info in commit message",
-      "matchManagers": [
-        "composer"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "composer/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "github-actions: action/ prefix, strip org keeping only action name, include from/to versions and update type",
@@ -386,34 +333,21 @@
       "matchUpdateTypes": [
         "major",
         "minor",
-        "patch"
+        "patch",
+        "digest"
       ],
       "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "github-actions pin/pinDigest: lowercase action word, show target SHA, include update type (built-in uses capital Pin and overrides topic)",
+      "description": "GitHub-hosted runner images (runs-on: ubuntu-24.04) come through the github-actions manager but are not actions: runner/ prefix.",
       "matchManagers": [
         "github-actions"
       ],
-      "matchUpdateTypes": [
-        "pin",
-        "pinDigest"
+      "matchDatasources": [
+        "github-runners"
       ],
-      "commitMessageAction": "pin",
-      "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (pin)"
-    },
-    {
-      "description": "github-actions digest: no extra info in commit message",
-      "matchManagers": [
-        "github-actions"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
-      "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageTopic": "runner/{{depName}}"
     },
     {
       "description": "Version inputs of actions (tflint_version, node-version, ...) are plain versions extracted as depType uses-with; pinning them to a commit SHA cannot be written (Errored branch on Dependency Dashboard #4).",
@@ -442,8 +376,7 @@
         "at any time"
       ],
       "automerge": true,
-      "reviewers": [],
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "reviewers": []
     },
     {
       "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type",
@@ -455,22 +388,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "pip/{{depName}}",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
-    },
-    {
-      "description": "pip_requirements/pip-compile digest: no extra info in commit message",
-      "matchManagers": [
-        "pip_requirements",
-        "pip-compile"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "pip/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
       "description": "pep621/poetry (pyproject.toml; pep621 also updates uv.lock, uv is not a Renovate manager): pip/ prefix, use resolved versions, include update type",
@@ -482,22 +404,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "pip/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "pep621/poetry digest: no extra info in commit message",
-      "matchManagers": [
-        "pep621",
-        "poetry"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "pip/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "pre-commit hooks: hook/ prefix, strip org keeping only hook name, include from/to versions and update type; use currentValue/newValue (raw tag) since some repos use non-semver tags where currentVersion would be empty",
@@ -508,24 +419,14 @@
         "major",
         "minor",
         "patch",
-        "pin"
+        "pin",
+        "digest"
       ],
       "commitMessageTopic": "hook/{{replace '.+/' '' depName}}",
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "pre-commit hooks digest: no extra info in commit message",
-      "matchManagers": [
-        "pre-commit"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
-      "commitMessageTopic": "hook/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
-    },
-    {
-      "description": "A pre-commit digest update means a release tag now points at a different commit — the signature of a hijacked tag (tj-actions/changed-files), never routine. Review by hand.",
+      "description": "A pre-commit digest update means a release tag now points at a different commit \u2014 the signature of a hijacked tag (tj-actions/changed-files), never routine. Review by hand.",
       "matchManagers": [
         "pre-commit"
       ],
@@ -547,21 +448,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "gem/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "bundler digest: no extra info in commit message",
-      "matchManagers": [
-        "bundler"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "gem/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "docker-compose: docker/ prefix, strip org/registry keeping only image name, include from/to versions and update type",
@@ -572,21 +463,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
-    },
-    {
-      "description": "docker-compose digest: no extra info in commit message",
-      "matchManagers": [
-        "docker-compose"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "docker/{{replace '.+/' '' depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
       "description": "cargo: rust/ prefix, use resolved versions, include update type",
@@ -597,21 +478,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "rust/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "cargo digest: no extra info in commit message",
-      "matchManagers": [
-        "cargo"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "rust/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "gomod: go/ prefix, use resolved versions, include update type",
@@ -622,21 +493,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "go/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "gomod digest: no extra info in commit message",
-      "matchManagers": [
-        "gomod"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "go/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "maven: maven/ prefix, use resolved versions, include update type",
@@ -647,21 +508,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "maven/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "maven digest: no extra info in commit message",
-      "matchManagers": [
-        "maven"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "maven/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "gradle/gradle-wrapper: gradle/ prefix, use resolved versions, include update type",
@@ -673,22 +524,11 @@
         "major",
         "minor",
         "patch",
-        "pin"
-      ],
-      "commitMessageTopic": "gradle/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
-    },
-    {
-      "description": "gradle/gradle-wrapper digest: no extra info in commit message",
-      "matchManagers": [
-        "gradle",
-        "gradle-wrapper"
-      ],
-      "matchUpdateTypes": [
+        "pin",
         "digest"
       ],
       "commitMessageTopic": "gradle/{{depName}}",
-      "commitMessageExtra": "to {{newDigestShort}} (digest)"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "nvm/.nvmrc/.node-version: node/ prefix, include from/to versions and update type",
@@ -705,7 +545,28 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "renovate/renovate image: prefix PR title with docker/. Changelog disabled — Renovate releases many times per day; fetching 10+ release notes from GitHub API hangs the runner. Its release dates come from GitHub releases, see the Docker Hub lookup rules below.",
+      "description": "Every digest update, in one place: the tag that moved, the old and new short digests and the update type, e.g. 'docker/debian stable-slim from 5f2c1a3 to a717a33 (digest)'. Placed after the per-manager rules (which also match digest updates, for their topic) so it overrides their version-style extra. The short digest also keeps titles unique: Renovate treats two pull requests with the same title as the same update, and would switch automerge off for every digest bump after the first.",
+      "matchUpdateTypes": [
+        "digest",
+        "pinDigest"
+      ],
+      "commitMessageExtra": "{{#if currentValue}}{{currentValue}} {{/if}}{{#if currentDigestShort}}from {{currentDigestShort}} {{/if}}to {{newDigestShort}} ({{updateType}})"
+    },
+    {
+      "description": "github-actions pin/pinDigest: lowercase action word, show target SHA, include update type (built-in uses capital Pin and overrides topic)",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "pin",
+        "pinDigest"
+      ],
+      "commitMessageAction": "pin",
+      "commitMessageTopic": "action/{{replace '.+/' '' depName}}",
+      "commitMessageExtra": "to {{newDigestShort}} (pin)"
+    },
+    {
+      "description": "renovate/renovate image: prefix PR title with docker/. Changelog disabled \u2014 Renovate releases many times per day; fetching 10+ release notes from GitHub API hangs the runner. Its release dates come from GitHub releases, see the Docker Hub lookup rules below.",
       "matchDepNames": [
         "renovate/renovate"
       ],
@@ -713,7 +574,7 @@
       "fetchChangeLogs": "off"
     },
     {
-      "description": "Docker Hub images with >1,000 tags, part 1. Docker Hub's tags API returns 403 past page 10; Renovate then drops the Docker Hub data for the whole image and falls back to the registry tag list, which has no timestamps, so every update sat in Pending Status Checks forever (2026-10-13). timestamp-optional would turn the age gate off, so look the versions up where the dates are. Keep these rules after every rule that matches matchDatasources docker (repo-level rules come after the preset's, so a repo rule matching docker would not see these images). renovate/renovate: GitHub releases have the same versions (tags without a v) with dates. Not npm, Renovate's documented overrideDatasource example: npm releases carry their integrity hash as newDigest, and the kubernetes manager writes any newDigest into the image, whatever pinDigests says, so 06898c5d pinned renovate/renovate:44.132.2@sha512-…, which no registry can pull (renovate-20261016-131513.log).",
+      "description": "Docker Hub images with >1,000 tags, part 1. Docker Hub's tags API returns 403 past page 10; Renovate then drops the Docker Hub data for the whole image and falls back to the registry tag list, which has no timestamps, so every update sat in Pending Status Checks forever (2026-10-13). timestamp-optional would turn the age gate off, so look the versions up where the dates are. Keep these rules after every rule that matches matchDatasources docker (repo-level rules come after the preset's, so a repo rule matching docker would not see these images). renovate/renovate: GitHub releases have the same versions (tags without a v) with dates. Not npm, Renovate's documented overrideDatasource example: npm releases carry their integrity hash as newDigest, and the kubernetes manager writes any newDigest into the image, whatever pinDigests says, so 06898c5d pinned renovate/renovate:44.132.2@sha512-\u2026, which no registry can pull (renovate-20261016-131513.log).",
       "matchDatasources": [
         "docker"
       ],
