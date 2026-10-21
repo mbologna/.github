@@ -35,7 +35,17 @@ jobs:
         if: inputs.use_uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          # Pinned, so the tool that enforces the callers' exclude-newer cooldown
+          # is age-gated too (Renovate tracks this input against astral-sh/uv
+          # releases); unpinned, setup-uv took the newest uv, a day old.
+          version: "0.12.24"
           python-version: ${{ inputs.python_version }}
+
+      # With a uv.lock, fail on a lock that no longer matches pyproject.toml
+      # instead of quietly re-locking (uv sync / uv run read UV_LOCKED).
+      - name: Require an up-to-date uv.lock
+        if: inputs.use_uv
+        run: if [ -f uv.lock ]; then echo "UV_LOCKED=1" >> "$GITHUB_ENV"; fi
 
       - name: Set up Python
         if: '!inputs.use_uv'
@@ -65,7 +75,17 @@ jobs:
         if: inputs.use_uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          # Pinned, so the tool that enforces the callers' exclude-newer cooldown
+          # is age-gated too (Renovate tracks this input against astral-sh/uv
+          # releases); unpinned, setup-uv took the newest uv, a day old.
+          version: "0.12.24"
           python-version: ${{ inputs.python_version }}
+
+      # With a uv.lock, fail on a lock that no longer matches pyproject.toml
+      # instead of quietly re-locking (uv sync / uv run read UV_LOCKED).
+      - name: Require an up-to-date uv.lock
+        if: inputs.use_uv
+        run: if [ -f uv.lock ]; then echo "UV_LOCKED=1" >> "$GITHUB_ENV"; fi
 
       - name: Set up Python
         if: '!inputs.use_uv'
