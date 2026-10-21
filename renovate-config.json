@@ -22,7 +22,7 @@
   "internalChecksAsSuccess": true,
   "commitMessageSuffix": "{{#if (and (equals manager 'github-actions') (containsString depName 'mbologna'))}}[automerge]{{else if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}[automerge]{{else if isLockfileUpdate}}[automerge]{{else if isMajor}}{{else if (equals updateType 'lockFileMaintenance')}}{{else}}[automerge]{{/if}}",
   "prBodyNotes": [
-    "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if (equals updateType 'pin')}}{{else if (containsString packageName 'mbologna/')}}{{else if (equals updateType 'lockFileMaintenance')}}No stability window: Renovate checks no release ages for lock-file maintenance, so this PR needs a manual merge.{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
+    "{{#if (equals manager 'github-actions')}}{{else if isVulnerabilityAlert}}{{else if isLockfileUpdate}}{{else if isMajor}}{{else if (equals updateType 'digest')}}{{else if (equals updateType 'pinDigest')}}{{else if (equals updateType 'pin')}}{{else if (containsString packageName 'mbologna/')}}{{else if (equals updateType 'lockFileMaintenance')}}npm and Poetry lock files resolve only releases at least 7 days old; other lock files are not age-gated. Manual merge.{{else if isMinor}}\ud83d\udcc5 Held for a **14-day** stability window before automerge.{{else}}\ud83d\udcc5 Held for a **7-day** stability window before automerge.{{/if}}"
   ],
   "dependencyDashboardTitle": "\ud83e\udd16 Renovate Dependency Dashboard",
   "dependencyDashboardLabels": [
@@ -60,7 +60,7 @@
     }
   },
   "lockFileMaintenance": {
-    "description": "Weekly refresh of every lock file to the newest versions the ranges allow, transitive ones included. Renovate checks no release ages for it, so it must not automerge: with automerge it merged unaged transitive releases within hours in every repo with a lock file (thelounge-plugin-apprise-push #55, #68, #76). A person merges it.",
+    "description": "Weekly refresh of every lock file to the newest versions the ranges allow, transitive ones included. Renovate posts no stability check for it, but hands minimumReleaseAge to two package managers: npm install --before=<now minus 7 days> and Poetry's POETRY_SOLVER_MIN_RELEASE_AGE, so npm and Poetry lock files take only releases at least 7 days old (the former 1 minute made that gate a no-op). Every other lock file (composer, cargo, uv, bundler, ...) takes whatever is newest, so it must not automerge: with automerge it merged unaged transitive releases within hours in every repo with a lock file (thelounge-plugin-apprise-push #55, #68, #76). A person merges it. timestamp-optional because the update has no release timestamp, so with the default the branch would stay pending.",
     "enabled": true,
     "automerge": false,
     "reviewers": [
@@ -71,7 +71,7 @@
     "schedule": [
       "before 9am on monday"
     ],
-    "minimumReleaseAge": "1 minute",
+    "minimumReleaseAge": "7 days",
     "minimumReleaseAgeBehaviour": "timestamp-optional"
   },
   "customDatasources": {
