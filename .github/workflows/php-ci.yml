@@ -57,7 +57,7 @@ on:
 jobs:
   ci:
     name: PHP ${{ inputs.php_version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: inputs.enable_test
     permissions:
       contents: read
@@ -97,7 +97,7 @@ jobs:
 
   lint:
     name: Lint PHP
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: inputs.enable_lint
     permissions:
       contents: read
