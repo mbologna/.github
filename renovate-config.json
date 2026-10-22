@@ -4,7 +4,7 @@
     "config:recommended"
   ],
   "configMigration": true,
-  "prCreation": "notPending",
+  "prCreation": "not-pending",
   "pinDigests": true,
   "osvVulnerabilityAlerts": true,
   "labels": [
