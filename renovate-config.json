@@ -423,6 +423,32 @@
       ]
     },
     {
+      "description": "GitHub Actions digest updates (a moved major tag such as actions/checkout v7) wait 7 days like a patch, aged against the newest release that tag matches (v7.0.2 when v7 moves to it). A branch ref (master) has no release and stays ungated. They were on the 1-minute digest floor, so a person's review was the only thing between a moved tag and every repo; now the update has also aged before anyone reviews it. Not the reusable workflows from mbologna/.github, which are reviewed where they change.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "matchDepNames": [
+        "!mbologna/.github"
+      ],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "One weekly PR per repository for all GitHub Actions updates, majors still separate, instead of one per action and digest. They all wait for a manual merge anyway (never automerged, see above), so batching them turns a steady trickle of reviews into one a week. Since the reusable workflows were consolidated, most land in mbologna/.github. Not its own reusable workflows, which keep automerging at any time.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchDepNames": [
+        "!mbologna/.github"
+      ],
+      "groupName": "github-actions",
+      "schedule": [
+        "before 9am on monday"
+      ]
+    },
+    {
       "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type",
       "matchManagers": [
         "pip_requirements",
