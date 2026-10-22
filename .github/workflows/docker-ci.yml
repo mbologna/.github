@@ -411,6 +411,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           # Regular expressions for package and exclude-tags (use-regex below).
+          # exclude-tags is ONE regex (not a comma list) and must pass the
+          # action's safe-regex2 check: no nested quantifiers.
           package: ^${{ inputs.image_name }}$
           keep-n-tagged: 5
           delete-untagged: true
@@ -426,7 +428,7 @@ jobs:
           # keep-n-tagged counted every sha-*/branch tag, and a busy day of main
           # pushes deleted backup-monitor's 1.0.0 image while hotel still pinned
           # it (2026-10-22).
-          exclude-tags: ^(latest|main|master|v?[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.]+)?)$
+          exclude-tags: '^(latest|main|master)$|^v?[0-9][0-9.]*$|^v?[0-9][0-9.]*-[0-9A-Za-z.]+$'
           use-regex: true
 
   release:

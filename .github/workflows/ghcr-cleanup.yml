@@ -29,5 +29,5 @@ jobs:
           delete-ghost-images: true
           delete-partial-images: true
           # Never release tags: consumers pin them as tag@digest (see docker-ci.yml).
-          exclude-tags: ^(latest|main|master|v?[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z.]+)?)$
+          exclude-tags: '^(latest|main|master)$|^v?[0-9][0-9.]*$|^v?[0-9][0-9.]*-[0-9A-Za-z.]+$'
           use-regex: true
