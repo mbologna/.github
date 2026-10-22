@@ -7,6 +7,20 @@ on:
         description: Docker image name (without registry prefix)
         required: true
         type: string
+      dockerfile:
+        description: Dockerfile path, relative to the repository root
+        required: false
+        type: string
+        default: Dockerfile
+      version_command:
+        description: >-
+          Optional shell command run inside the built image (linux/amd64) that prints
+          the software version, e.g. "salt-master --version | cut -d' ' -f2". The
+          version and its major part become extra tags on the default branch, for an
+          image whose version comes from what it installs rather than from a git tag.
+        required: false
+        type: string
+        default: ""
       push_to_dockerhub:
         description: Also push to Docker Hub (requires DOCKER_USERNAME / DOCKER_PASSWORD secrets)
         required: false
@@ -72,7 +86,7 @@ jobs:
       - name: Hadolint
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
-          dockerfile: Dockerfile
+          dockerfile: ${{ inputs.dockerfile }}
           failure-threshold: error
           # DL3006 (no tag) / DL3007 (:latest) stay warning-level by default, which
           # this failure-threshold ignores. Force them to error so unpinned/:latest
@@ -112,7 +126,7 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             cache_scope: linux-amd64
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
@@ -136,10 +150,12 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
+          file: ${{ inputs.dockerfile }}
           platforms: ${{ matrix.platform }}
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
-          cache-from: type=gha,scope=${{ matrix.cache_scope }}
-          cache-to: type=gha,scope=${{ matrix.cache_scope }},mode=max
+          # Scoped per image: a repository may call this workflow once per image.
+          cache-from: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }}
+          cache-to: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }},mode=max
           provenance: false
           sbom: false
 
@@ -154,7 +170,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: digest-${{ matrix.cache_scope }}
+          name: digest-${{ inputs.image_name }}-${{ matrix.cache_scope }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -178,7 +194,7 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: /tmp/digests
-          pattern: digest-*
+          pattern: digest-${{ inputs.image_name }}-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
@@ -198,6 +214,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Read the version from the image
+        id: version
+        if: inputs.version_command != ''
+        working-directory: /tmp/digests
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}
+          VERSION_COMMAND: ${{ inputs.version_command }}
+        # The digests are per platform; only the amd64 one runs on this runner.
+        run: |
+          set -euo pipefail
+          version=""
+          for digest in *; do
+            if version=$(docker run --rm --platform linux/amd64 --entrypoint sh \
+                "${IMAGE}@sha256:${digest}" -c "${VERSION_COMMAND}" 2>/dev/null) && [ -n "$version" ]; then
+              break
+            fi
+          done
+          if ! [[ $version =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error::version_command printed '${version}', not a version"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "major=${version%%.*}" >> "$GITHUB_OUTPUT"
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
@@ -213,6 +253,8 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            ${{ steps.version.outputs.version && format('type=raw,value={0},enable={{{{is_default_branch}}}}', steps.version.outputs.version) || '' }}
+            ${{ steps.version.outputs.major && format('type=raw,value={0},enable={{{{is_default_branch}}}}', steps.version.outputs.major) || '' }}
             ${{ inputs.extra_tags }}
 
       - name: Create multi-arch manifest and push tags

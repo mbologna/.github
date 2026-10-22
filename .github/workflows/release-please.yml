@@ -1,0 +1,22 @@
+name: Release Please
+
+# Keeps a release pull request open with the next version and changelog, built
+# from the Conventional Commit titles on the default branch; merging it tags the
+# release and publishes the GitHub release. The caller keeps its own
+# release-please-config.json and .release-please-manifest.json.
+#
+# The PR is opened with GITHUB_TOKEN, so CI does not run on it: merge it with an
+# admin ruleset bypass, or close and reopen it to trigger CI.
+
+on:
+  workflow_call:
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
