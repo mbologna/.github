@@ -42,7 +42,7 @@ on:
 jobs:
   validate:
     name: Terraform Validate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -75,7 +75,7 @@ jobs:
 
   tflint:
     name: tflint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -92,7 +92,7 @@ jobs:
 
   opentofu:
     name: OpenTofu Validate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -125,7 +125,7 @@ jobs:
 
   yamllint:
     name: YAML Lint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -141,7 +141,7 @@ jobs:
 
   actionlint:
     name: actionlint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions: {}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -151,7 +151,7 @@ jobs:
 
   trivy-iac:
     name: Trivy IaC Scan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       security-events: write
       contents: read
@@ -169,7 +169,7 @@ jobs:
 
   terraform-docs:
     name: terraform-docs
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: inputs.enable_terraform_docs
     permissions:
       contents: write
@@ -191,7 +191,7 @@ jobs:
 
   shellcheck:
     name: ShellCheck
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: inputs.enable_shellcheck
     permissions: {}
     steps:
