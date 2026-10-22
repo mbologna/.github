@@ -63,7 +63,7 @@ on:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
@@ -161,7 +161,7 @@ jobs:
 
   merge:
     name: Merge multi-arch manifest
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build
     if: github.event_name != 'pull_request'
     permissions:
@@ -237,7 +237,7 @@ jobs:
 
   scan-trivy:
     name: Security Scan (trivy)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: merge
     if: github.event_name != 'pull_request'
     permissions:
@@ -264,7 +264,7 @@ jobs:
 
   scan-grype:
     name: Security Scan (grype)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: merge
     if: inputs.enable_grype && github.event_name != 'pull_request'
     permissions:
@@ -290,7 +290,7 @@ jobs:
 
   sign:
     name: Sign Images
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: merge
     if: inputs.enable_cosign && github.event_name != 'pull_request'
     permissions:
@@ -331,7 +331,7 @@ jobs:
 
   integration-test:
     name: Integration Tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: merge
     if: inputs.enable_integration_test && github.event_name != 'pull_request'
     permissions:
@@ -355,7 +355,7 @@ jobs:
 
   cleanup:
     name: Cleanup old package versions
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [scan-trivy, scan-grype, sign, integration-test]
     if: |
       always() &&
@@ -382,7 +382,7 @@ jobs:
 
   release:
     name: Release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [merge, scan-trivy, scan-grype, sign]
     # !cancelled() && !failure(): without a status function, a skipped need
     # skips this job too, and scan-grype (and sign, without enable_cosign) is
