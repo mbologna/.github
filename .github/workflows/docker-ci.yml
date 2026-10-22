@@ -410,10 +410,12 @@ jobs:
         uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f # v1.2.2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # Regular expressions for package and exclude-tags (use-regex below).
-          # exclude-tags is ONE regex (not a comma list) and must pass the
-          # action's safe-regex2 check: no nested quantifiers.
-          package: ^${{ inputs.image_name }}$
+          # use-regex (below) makes exclude-tags ONE regex (not a comma list),
+          # which must pass the action's safe-regex2 check: no nested
+          # quantifiers. package stays the plain name: the action logs in to
+          # the registry with it, and an anchored ^name$ failed that login.
+          # Image names here have no regex metacharacters.
+          package: ${{ inputs.image_name }}
           keep-n-tagged: 5
           delete-untagged: true
           # Concurrent runs push untagged per-arch digests that their merge job
