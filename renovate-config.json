@@ -802,7 +802,36 @@
       "groupName": "opentofu"
     },
     {
-      "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo), never auto-merged because it changes workflows and can break the site build; the PR build of the caller repo shows whether the new version works. MUST be last so it overrides the regex and github-actions rules above. The empty commitMessageSuffix drops the [automerge] title tag, which the top-level template derives from update type, not from this rule's automerge: false.",
+      "description": "Language runtime images (python, php, ruby): a minor bump is a new language version (3.12 to 3.13, 8.4 to 8.5) that removes deprecated APIs, not a compatible fix. On a floating tag (3.12-alpine) its only date is the latest rebuild, so the floating-tag rule's 3 days were all it waited, and CI usually tests the old version (the reusable workflows' python_version input), so green CI says little. A person merges it after moving that input and requires-python. Node is not listed: its language versions are majors, already manual.",
+      "matchDatasources": [
+        "docker",
+        "custom.dockerhub-suffix"
+      ],
+      "matchDepNames": [
+        "python",
+        "docker.io/library/python",
+        "php",
+        "docker.io/library/php",
+        "ruby",
+        "docker.io/library/ruby"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "mbologna"
+      ],
+      "labels": [
+        "dependencies",
+        "manual-review"
+      ],
+      "prBodyNotes": [
+        "A new language version: move the CI workflow's python_version (or PHP/Ruby version) input and the project's requires-python to match in this PR, then merge."
+      ]
+    },
+    {
+      "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo), never auto-merged because it changes workflows and can break the site build; the PR build of the caller repo shows whether the new version works. MUST be last so it overrides the regex and github-actions rules above.",
       "matchPackageNames": [
         "gohugoio/hugo"
       ],
