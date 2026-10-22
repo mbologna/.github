@@ -9,11 +9,12 @@
 # Caller sets AUTO_RELEASE_STRATEGY ("docker" or "commits") as a job/global variable.
 # Needs a token with api + write_repository scope to push the tag and create the
 # Release (and, for "docker" strategy, to read the project's own container registry).
-# Defaults to $RENOVATE_TOKEN (already present in every project for the shared
-# renovate.yml job, and already proven to have the right scope - Renovate itself
-# pushes branches/MRs with it). Override per-job if a project uses a different
-# variable name for this (e.g. thelounge-patched, which has no RENOVATE_TOKEN and
-# sets `variables: AUTO_RELEASE_TOKEN: "${GITLAB_API_TOKEN}"` instead).
+# Defaults to $RENOVATE_TOKEN, the variable the old per-project Renovate job
+# shared. That job and its variable are gone (2026-10-22; Renovate runs from the
+# infra repo's cluster, and the token had been revoked), so a project relying on
+# this needs its own AUTO_RELEASE_TOKEN variable (api + write_repository) before
+# the job can push a tag again, e.g. `variables: AUTO_RELEASE_TOKEN:
+# "${GITLAB_API_TOKEN}"` as thelounge-patched does.
 #
 # No semver tag found yet -> silently skips (push an initial vX.Y.Z tag manually once
 # to bootstrap, same bootstrap requirement as the GitHub Actions version).
