@@ -414,6 +414,17 @@
       "pinDigests": false
     },
     {
+      "description": "GitLab CI includes and components (include: project: ... ref: v1.0.0, component: ...@1.0.0) are looked up as gitlab-tags; pinning them to a commit SHA cannot be written (\"Digest is not updated\", then \"Error updating branch: update failure\" on renovate/pin-dependencies in every GitLab project, 2026-10-23).",
+      "matchManagers": [
+        "gitlabci",
+        "gitlabci-include"
+      ],
+      "matchDatasources": [
+        "gitlab-tags"
+      ],
+      "pinDigests": false
+    },
+    {
       "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run \u2014 skip stability window, bypass schedule, automerge on green CI, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. timestamp-optional release-age behaviour because github-digest SHAs carry no releaseTimestamp \u2014 timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique \u2014 without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins.",
       "matchManagers": [
         "github-actions"
