@@ -49,6 +49,24 @@ jobs:
         id: sha
         run: echo "short=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
+      # Cloud Run pulls docker.io images through mirror.gcr.io, which can
+      # lag a fresh push by a minute or more; deploying first fails with
+      # "Image 'mirror.gcr.io/...' not found" (seen 2026-10-22 in three repos).
+      - name: Wait for the image on mirror.gcr.io
+        env:
+          IMAGE_NAME: ${{ inputs.image_name }}
+          SHORT_SHA: ${{ steps.sha.outputs.short }}
+        run: |
+          url="https://mirror.gcr.io/v2/mbologna/${IMAGE_NAME}/manifests/sha-${SHORT_SHA}"
+          accept='application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
+          for _ in $(seq 40); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -H "Accept: ${accept}" "$url")
+            [[ $code == 200 ]] && exit 0
+            sleep 15
+          done
+          echo "::error::mbologna/${IMAGE_NAME}:sha-${SHORT_SHA} not on mirror.gcr.io after 10 minutes (last HTTP ${code})"
+          exit 1
+
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
