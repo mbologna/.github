@@ -74,23 +74,25 @@ jobs:
 
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
-      - name: Deploy Cloud Run Service
-        if: inputs.deploy_type == 'service'
-        uses: google-github-actions/deploy-cloudrun@2028e2d7d30a78c6910e0632e48dd561b064884d # v3
-        with:
-          service: ${{ inputs.deploy_name }}
-          image: docker.io/mbologna/${{ inputs.image_name }}:sha-${{ steps.sha.outputs.short }}
-          region: ${{ inputs.region }}
-
-      - name: Deploy Cloud Run Job
-        if: inputs.deploy_type == 'job'
+      # The mirror can list the tag before Cloud Run can import the image
+      # ("Container import failed"), so retry a failed deploy twice.
+      - name: Deploy to Cloud Run
         env:
+          DEPLOY_TYPE: ${{ inputs.deploy_type }}
           DEPLOY_NAME: ${{ inputs.deploy_name }}
           IMAGE_NAME: ${{ inputs.image_name }}
           SHORT_SHA: ${{ steps.sha.outputs.short }}
           REGION: ${{ inputs.region }}
         run: |
-          gcloud run jobs deploy "$DEPLOY_NAME" \
-            --image "docker.io/mbologna/$IMAGE_NAME:sha-$SHORT_SHA" \
-            --region "$REGION" \
-            --quiet
+          if [[ $DEPLOY_TYPE == service ]]; then cmd=(gcloud run deploy); else cmd=(gcloud run jobs deploy); fi
+          for attempt in 1 2 3; do
+            if "${cmd[@]}" "$DEPLOY_NAME" \
+                --image "docker.io/mbologna/$IMAGE_NAME:sha-$SHORT_SHA" \
+                --region "$REGION" \
+                --update-labels "managed-by=github-actions,commit-sha=$GITHUB_SHA" \
+                --quiet; then
+              exit 0
+            fi
+            [[ $attempt == 3 ]] || { echo "::warning::deploy attempt $attempt failed, retrying in 60 s"; sleep 60; }
+          done
+          exit 1
