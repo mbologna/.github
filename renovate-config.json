@@ -823,11 +823,11 @@
       "extractVersion": "^v(?<version>.+)$"
     },
     {
-      "description": "Floating tags on custom.dockerhub-suffix (3.12-alpine, 1.29-alpine, 28-dind): Docker Hub's date for them is the latest rebuild, and official images rebuild every week or two, so the 14-day minor and 30-day major gates could never pass (python 3.15, docker 29-dind, nginx-unprivileged 1.31, 2026-10-13). A short gate still bounds the real age: a tag 3 days past its latest rebuild is at least 3 days old. Fixed tags (1.31.6-alpine) keep the normal gates. Must stay after the dockerhub-suffix override rules, which change the datasource it matches.",
+      "description": "Floating tags on custom.dockerhub-suffix (3.12-alpine, 1.29-alpine, 28-dind, and bare ones such as docker 28 or python 3.12): Docker Hub's date for them is the latest rebuild, and official images rebuild every week or two, so the 14-day minor and 30-day major gates could never pass (python 3.15, docker 29-dind, nginx-unprivileged 1.31, 2026-10-13). A short gate still bounds the real age: a tag 3 days past its latest rebuild is at least 3 days old. Fixed tags (1.31.6-alpine) keep the normal gates. Bare floating tags were left out until 2026-10-23, so docker:28 never got its 29 update: 29 is rebuilt more often than every 30 days, and 28, end-of-life and off the newest-100 page, could not even get a digest pin. Must stay after the dockerhub-suffix override rules, which change the datasource it matches.",
       "matchDatasources": [
         "custom.dockerhub-suffix"
       ],
-      "matchCurrentValue": "/^v?\\d+(\\.\\d+)?-/",
+      "matchCurrentValue": "/^v?\\d+(\\.\\d+)?(-|$)/",
       "minimumReleaseAge": "3 days"
     },
     {
