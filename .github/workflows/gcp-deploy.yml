@@ -84,12 +84,16 @@ jobs:
           SHORT_SHA: ${{ steps.sha.outputs.short }}
           REGION: ${{ inputs.region }}
         run: |
-          if [[ $DEPLOY_TYPE == service ]]; then cmd=(gcloud run deploy); else cmd=(gcloud run jobs deploy); fi
+          # Jobs take no --update-labels, and Terraform owns their labels.
+          if [[ $DEPLOY_TYPE == service ]]; then
+            cmd=(gcloud run deploy --update-labels "managed-by=github-actions,commit-sha=$GITHUB_SHA")
+          else
+            cmd=(gcloud run jobs deploy)
+          fi
           for attempt in 1 2 3; do
             if "${cmd[@]}" "$DEPLOY_NAME" \
                 --image "docker.io/mbologna/$IMAGE_NAME:sha-$SHORT_SHA" \
                 --region "$REGION" \
-                --update-labels "managed-by=github-actions,commit-sha=$GITHUB_SHA" \
                 --quiet; then
               exit 0
             fi
