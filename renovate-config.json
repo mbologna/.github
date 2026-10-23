@@ -474,7 +474,7 @@
       ]
     },
     {
-      "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type",
+      "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type. A lock-file-only update of an indirect dependency (a security fix in a pip-compile lock) has no currentValue or newValue, so it is titled with newVersion alone (dotfiles !21 read \"update pip/certifi from to\").",
       "matchManagers": [
         "pip_requirements",
         "pip-compile"
@@ -487,7 +487,7 @@
         "digest"
       ],
       "commitMessageTopic": "pip/{{depName}}",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+      "commitMessageExtra": "{{#if currentValue}}from {{currentValue}} to {{newValue}}{{else}}to {{newVersion}}{{/if}} ({{updateType}})"
     },
     {
       "description": "pep621/poetry (pyproject.toml; pep621 also updates uv.lock, uv is not a Renovate manager): pip/ prefix, use resolved versions, include update type",
