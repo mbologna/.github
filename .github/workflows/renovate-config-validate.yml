@@ -1,10 +1,12 @@
 name: Validate Renovate preset
 
 # renovate-config.json is the update policy for every repo in this account, and
-# nothing used to check it. On 2026-10-08 Renovate 44 dropped transitiveRemediation,
-# renamed the regex manager to custom.regex, and started rejecting rangeStrategy
-# next to matchUpdateTypes — the preset went invalid and every consuming repo was
-# affected in the same hour, with no signal anywhere until a run was read by hand.
+# nothing used to check it. On 2026-10-08 Renovate flagged the preset as invalid:
+# it still carried transitiveRemediation (removed in Renovate 38), the old regex
+# manager name (now custom.regex), and rangeStrategy next to matchUpdateTypes,
+# which Renovate rejects. All three had been there since the preset's first
+# commit. Every consuming repo was affected at once, with no signal anywhere
+# until a run was read by hand.
 #
 # Validated against renovate@latest ON PURPOSE, not a pinned version. The fastest-
 # moving consumer of this preset is Mend's hosted app on GitHub, which upgrades
