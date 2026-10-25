@@ -456,13 +456,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      # auto-release creates the Release, with its grouped notes, before it
+      # dispatches this build; release-drafter would overwrite them. Only a
+      # tag pushed by hand still gets its Release here.
+      - name: Check for an existing release
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "${GITHUB_REF_NAME} already has a release; keeping its notes"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Draft release notes
         id: notes
+        if: steps.existing.outputs.exists != 'true'
         uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create release
+        if: steps.existing.outputs.exists != 'true'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           body: ${{ steps.notes.outputs.body }}

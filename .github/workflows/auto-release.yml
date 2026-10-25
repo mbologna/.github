@@ -1,138 +1,70 @@
 name: Auto Release
 
+# Tags the next version and publishes its GitHub Release with notes grouped by
+# Conventional Commit type, using the forge-agnostic auto-release image
+# (https://github.com/mbologna/auto-release, which documents the rules). No
+# release pull request: the caller runs this on its schedule.
+
 on:
   workflow_call:
     inputs:
       strategy:
-        description: "'docker' (compare image digests) or 'commits' (any commit since last tag)"
+        description: >-
+          'commits' (any commit since the last tag), 'conventional' (a feat, fix,
+          perf, revert or breaking commit since the last tag) or 'docker'
+          (compare image digests)
         required: true
         type: string
       image:
-        description: "Full Docker image ref for docker strategy (e.g. docker.io/mbologna/docker-bitlbee)"
+        description: "Image for the docker strategy, without a tag (e.g. docker.io/mbologna/docker-bitlbee)"
         required: false
         type: string
         default: ""
+      base_image_pattern:
+        description: Extended regex; matching Dockerfile lines go into every release's notes
+        required: false
+        type: string
+        default: ""
+      dispatch_tag_build:
+        description: Start the calling workflow on the new tag (false when nothing builds on tags)
+        required: false
+        type: boolean
+        default: true
+      dry_run:
+        description: Only print the next version and its notes, in the job summary
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   auto-release:
     name: Auto Release (${{ inputs.strategy }})
     runs-on: ubuntu-26.04
     # No permissions block: the job takes what the caller's job grants, which
-    # must be `contents: write` (push the tag) and `actions: write` (dispatch the
-    # tag build). Declaring actions: write here would make every caller that
-    # doesn't grant it fail at startup on its next pin bump; inheriting it
-    # instead confines the failure to the "Build the tag" step.
+    # must be `contents: write` (push the tag, create the Release) and
+    # `actions: write` (dispatch the tag build). Declaring actions: write here
+    # would make every caller that doesn't grant it fail at startup on its next
+    # pin bump; inheriting it instead confines the failure to the dispatch.
+    container:
+      image: ghcr.io/mbologna/auto-release:0.1.0@sha256:df967bcf700b0c47bb8c5336e0b77de8cbf2d5ed03a6d2ae810cd34d8476909f
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
-      - name: Get latest semver tag
-        id: latest
-        run: |
-          TAG=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
-          if [ -z "$TAG" ]; then
-            echo "No semver tag found — skipping (create an initial tag manually to bootstrap auto-release)"
-            echo "tag=" >> "$GITHUB_OUTPUT"
-          else
-            echo "Latest tag: $TAG"
-            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Check if release needed
-        id: check
-        if: steps.latest.outputs.tag != ''
-        run: |
-          set -eo pipefail
-          NEEDED=false
-
-          if [ "${{ inputs.strategy }}" = "docker" ]; then
-            REPO=$(echo "${{ inputs.image }}" | sed 's|^docker\.io/||')
-            VERSION="${{ steps.latest.outputs.tag }}"
-            VERSION="${VERSION#v}"
-
-            TAGGED=$(curl -s "https://hub.docker.com/v2/repositories/${REPO}/tags/${VERSION}" \
-              | jq -r '.digest // empty')
-            LATEST=$(curl -s "https://hub.docker.com/v2/repositories/${REPO}/tags/latest" \
-              | jq -r '.digest // empty')
-
-            echo "Tagged (${VERSION}) digest : ${TAGGED:-not found}"
-            echo "Latest              digest : ${LATEST:-not found}"
-
-            # Release if: latest exists AND (version tag was never published OR digests differ).
-            # A missing version tag means the CI run that should have published it failed,
-            # so latest already contains newer content.
-            if [ -n "$LATEST" ] && { [ -z "$TAGGED" ] || [ "$TAGGED" != "$LATEST" ]; }; then
-              NEEDED=true
-            fi
-
-          elif [ "${{ inputs.strategy }}" = "commits" ]; then
-            COUNT=$(git log "${{ steps.latest.outputs.tag }}..HEAD" --oneline | wc -l | tr -d ' ')
-            echo "Commits since ${{ steps.latest.outputs.tag }}: ${COUNT}"
-            [ "$COUNT" -gt 0 ] && NEEDED=true
-          fi
-
-          echo "needed=${NEEDED}" >> "$GITHUB_OUTPUT"
-
-      - name: Compute next version
-        id: next
-        if: steps.check.outputs.needed == 'true'
-        # For the "commits" strategy, bump type follows Conventional Commits: any
-        # "type!:" subject or "BREAKING CHANGE:" footer since the last tag -> major;
-        # any "feat:" -> minor; otherwise patch. The "docker" strategy has no commit
-        # history to classify (it compares image digests), so it always stays patch.
-        run: |
-          set -euo pipefail
-          TAG="${{ steps.latest.outputs.tag }}"
-          VER="${TAG#v}"
-          MAJOR=$(echo "$VER" | cut -d. -f1)
-          MINOR=$(echo "$VER" | cut -d. -f2)
-          PATCH=$(echo "$VER" | cut -d. -f3)
-
-          BUMP="patch"
-          if [ "${{ inputs.strategy }}" = "commits" ]; then
-            COMMITS=$(git log "${TAG}..HEAD" --format='%s%n%b' --no-merges)
-            if echo "$COMMITS" | grep -qE '^[a-zA-Z]+(\([^)]*\))?!:|^BREAKING CHANGE:'; then
-              BUMP="major"
-            elif echo "$COMMITS" | grep -qE '^feat(\([^)]*\))?:'; then
-              BUMP="minor"
-            fi
-          fi
-
-          case "$BUMP" in
-            major) NEW_TAG="v$((MAJOR + 1)).0.0" ;;
-            minor) NEW_TAG="v${MAJOR}.$((MINOR + 1)).0" ;;
-            patch) NEW_TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
-          esac
-
-          echo "Bump type: ${BUMP}"
-          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
-          echo "Next tag: ${NEW_TAG}"
-
-      - name: Push tag
-        if: steps.next.outputs.new_tag != ''
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.next.outputs.new_tag }}"
-          git push origin "${{ steps.next.outputs.new_tag }}"
-          echo "Released: ${{ steps.next.outputs.new_tag }}"
-
       # A tag pushed with GITHUB_TOKEN never triggers the caller's `push: tags`
-      # run (GitHub's anti-recursion rule), so without this the tag exists but
-      # no image or release is ever built for it. workflow_dispatch is the one
-      # event GITHUB_TOKEN may trigger. The caller must grant `actions: write`
-      # and list `workflow_dispatch` in its `on:`.
-      - name: Build the tag
-        if: steps.next.outputs.new_tag != ''
+      # run (GitHub's anti-recursion rule), so auto-release starts the build
+      # with workflow_dispatch, the one event GITHUB_TOKEN may trigger. The
+      # caller must list `workflow_dispatch` in its `on:`.
+      - name: Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          AUTO_RELEASE_STRATEGY: ${{ inputs.strategy }}
+          AUTO_RELEASE_IMAGE: ${{ inputs.image }}
+          AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
+          AUTO_RELEASE_DISPATCH: ${{ inputs.dispatch_tag_build }}
+          AUTO_RELEASE_DRY_RUN: ${{ inputs.dry_run }}
           # In a called workflow, github.workflow_ref is the caller's:
           # owner/repo/.github/workflows/ci.yml@refs/heads/main
-          CALLER: ${{ github.workflow_ref }}
-        run: |
-          set -euo pipefail
-          WORKFLOW="${CALLER%@*}"
-          WORKFLOW="${WORKFLOW##*/}"
-          gh workflow run "$WORKFLOW" --repo "${{ github.repository }}" --ref "${{ steps.next.outputs.new_tag }}"
-          echo "Dispatched ${WORKFLOW} on ${{ steps.next.outputs.new_tag }}"
+          AUTO_RELEASE_DISPATCH_WORKFLOW: ${{ github.workflow_ref }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: auto-release release
