@@ -30,6 +30,13 @@ on:
         required: false
         type: boolean
         default: true
+      dispatch_workflow:
+        description: >-
+          Workflow file to start on the new tag (e.g. publish.yml); empty means the
+          calling workflow
+        required: false
+        type: string
+        default: ""
       dry_run:
         description: Only print the next version and its notes, in the job summary
         required: false
@@ -65,6 +72,6 @@ jobs:
           AUTO_RELEASE_DRY_RUN: ${{ inputs.dry_run }}
           # In a called workflow, github.workflow_ref is the caller's:
           # owner/repo/.github/workflows/ci.yml@refs/heads/main
-          AUTO_RELEASE_DISPATCH_WORKFLOW: ${{ github.workflow_ref }}
+          AUTO_RELEASE_DISPATCH_WORKFLOW: ${{ inputs.dispatch_workflow || github.workflow_ref }}
           GITHUB_TOKEN: ${{ github.token }}
         run: auto-release release
