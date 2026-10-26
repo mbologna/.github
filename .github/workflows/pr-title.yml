@@ -1,0 +1,41 @@
+name: PR title
+
+# Checks that a pull request's title is a Conventional Commit subject. PRs are
+# squash-merged with the title as the commit subject, so the title is what
+# auto-release reads: it decides the release-note line and the version bump.
+# Callers run it from their own pr-title.yml on
+# `pull_request: types: [opened, edited, synchronize, reopened]`, so editing a
+# title reruns only this check.
+
+on:
+  workflow_call:
+  # This repository's own pull requests.
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  pr-title:
+    name: Conventional PR title
+    runs-on: ubuntu-26.04
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            revert
+            docs
+            style
+            refactor
+            test
+            build
+            ci
+            chore
+          requireScope: false
+          # The subject may start with anything (Renovate writes "update x").
+          subjectPattern: ^.+$
