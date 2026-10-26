@@ -12,11 +12,13 @@ on:
         description: >-
           'commits' (any commit since the last tag), 'conventional' (a feat, fix,
           perf, revert or breaking commit since the last tag) or 'docker'
-          (compare image digests)
+          (compare image digests). A push always runs 'security' instead.
         required: true
         type: string
       image:
-        description: "Image for the docker strategy, without a tag (e.g. docker.io/mbologna/docker-bitlbee)"
+        description: >-
+          Image without a tag (e.g. docker.io/mbologna/docker-bitlbee), for the docker
+          strategy and the security strategy's CVE check
         required: false
         type: string
         default: ""
@@ -53,7 +55,7 @@ jobs:
     # would make every caller that doesn't grant it fail at startup on its next
     # pin bump; inheriting it instead confines the failure to the dispatch.
     container:
-      image: ghcr.io/mbologna/auto-release:0.1.4@sha256:ec9df266bf9f35148b920d474d178f6278d98bd07d0e6b2ea1f7856d1983adbc
+      image: ghcr.io/mbologna/auto-release:0.2.0@sha256:28e5487aa0c4c6132961187504e1b17e9d62bcc41ffba009169877c1e1b45ec9
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -65,7 +67,10 @@ jobs:
       # caller must list `workflow_dispatch` in its `on:`.
       - name: Release
         env:
-          AUTO_RELEASE_STRATEGY: ${{ inputs.strategy }}
+          # A push releases only a CVE fix (a fix(security) commit, or an image
+          # rebuild that dropped fixable HIGH/CRITICAL findings); everything
+          # else waits for the scheduled run.
+          AUTO_RELEASE_STRATEGY: ${{ github.event_name == 'push' && 'security' || inputs.strategy }}
           AUTO_RELEASE_IMAGE: ${{ inputs.image }}
           AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
           AUTO_RELEASE_DISPATCH: ${{ inputs.dispatch_tag_build }}
