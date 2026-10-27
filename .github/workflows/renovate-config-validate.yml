@@ -27,11 +27,11 @@ on:
       - renovate-config.json
       - renovate.json
       - .github/workflows/renovate-config-validate.yml
+  # Every PR, with no paths filter: main's ruleset requires this check, and a
+  # path-filtered workflow never reports on a PR that misses the paths, which
+  # left such PRs blocked for good (.github#118, 2026-10-27). The "scope" step
+  # below skips the validation itself when the PR leaves the config alone.
   pull_request:
-    paths:
-      - renovate-config.json
-      - renovate.json
-      - .github/workflows/renovate-config-validate.yml
   schedule:
     # Mondays 05:00 UTC, an hour before the 06:00 auto-release run that gives
     # Renovate its week of work.
@@ -48,6 +48,28 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # A PR checks out its merge commit; depth 2 brings its first parent,
+          # the base branch, so the scope step can diff against it.
+          fetch-depth: 2
+
+      # The same paths the push trigger filters on. On a PR that touches none
+      # of them the job still succeeds, satisfying the required check, without
+      # running the validator.
+      - name: Scope
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != pull_request ] || git diff --name-only HEAD^1 HEAD -- \
+            renovate-config.json renovate.json \
+            .github/workflows/renovate-config-validate.yml | grep -q .; then
+            echo "validate=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "validate=false" >>"$GITHUB_OUTPUT"
+            echo "PR leaves the Renovate config alone; skipping validation."
+          fi
 
       # "latest" only means latest on a Node that Renovate supports: npx skips
       # releases whose engines exclude the runner's Node, and the ubuntu-24.04
@@ -55,10 +77,12 @@ jobs:
       # Renovate. The 26.04 runner, with a newer Node, got the real latest
       # (44.178) and failed on prCreation (2026-10-22).
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        if: steps.scope.outputs.validate == 'true'
         with:
           node-version: "24"
 
       - name: Validate the preset and this repo's own config
+        if: steps.scope.outputs.validate == 'true'
         run: |
           set -uo pipefail
           # Both files by name: a bare invocation only auto-discovers
