@@ -12,7 +12,9 @@ on:
         description: >-
           'commits' (any commit since the last tag), 'conventional' (a feat, fix,
           perf, revert or breaking commit since the last tag) or 'docker'
-          (compare image digests). A push always runs 'security' instead.
+          (compare image digests). A push always runs 'security' instead, a
+          manual run 'commits', and a scheduled 'docker' run after the 7th of the
+          month 'conventional' (the dependency refresh is monthly).
         required: true
         type: string
       image:
@@ -67,10 +69,8 @@ jobs:
       # caller must list `workflow_dispatch` in its `on:`.
       - name: Release
         env:
-          # A push releases only a CVE fix (a fix(security) commit, or an image
-          # rebuild that dropped fixable HIGH/CRITICAL findings); everything
-          # else waits for the scheduled run.
-          AUTO_RELEASE_STRATEGY: ${{ github.event_name == 'push' && 'security' || inputs.strategy }}
+          EVENT: ${{ github.event_name }}
+          STRATEGY: ${{ inputs.strategy }}
           AUTO_RELEASE_IMAGE: ${{ inputs.image }}
           AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
           AUTO_RELEASE_DISPATCH: ${{ inputs.dispatch_tag_build }}
@@ -79,4 +79,26 @@ jobs:
           # owner/repo/.github/workflows/ci.yml@refs/heads/main
           AUTO_RELEASE_DISPATCH_WORKFLOW: ${{ inputs.dispatch_workflow || github.workflow_ref }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: auto-release release
+        # The strategy depends on what started the run:
+        # - push: only a CVE fix (a fix(security) commit, or an image rebuild
+        #   that dropped fixable HIGH/CRITICAL findings) releases, at once.
+        # - workflow_dispatch: a manual run releases whatever is unreleased.
+        # - schedule: the caller's strategy, except that 'docker' (which
+        #   releases on any image change, base-image and dependency bumps
+        #   included) runs only in the first week of the month and is
+        #   'conventional' on the other Mondays. Dependency-only releases come
+        #   monthly; feat/fix still release weekly and CVE fixes on push.
+        run: |
+          case "$EVENT" in
+            push) strategy=security ;;
+            workflow_dispatch) strategy=commits ;;
+            *)
+              strategy=$STRATEGY
+              day=$(date -u +%d)
+              if [ "$strategy" = docker ] && [ "${day#0}" -gt 7 ]; then
+                strategy=conventional
+              fi
+              ;;
+          esac
+          echo "strategy: $strategy (event $EVENT, caller's $STRATEGY)"
+          AUTO_RELEASE_STRATEGY=$strategy auto-release release
