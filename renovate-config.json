@@ -425,7 +425,7 @@
       "pinDigests": false
     },
     {
-      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run \u2014 skip stability window, bypass schedule, automerge on green CI, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. timestamp-optional release-age behaviour because github-digest SHAs carry no releaseTimestamp \u2014 timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique \u2014 without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins.",
+      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run \u2014 skip stability window, automerge on green CI at any time, and clear reviewer assigned by the major rule. 1-minute floor (not 0 days) ensures Renovate posts a stability check so internalChecksAsSuccess can green-light repos without CI. timestamp-optional release-age behaviour because github-digest SHAs carry no releaseTimestamp \u2014 timestamp-required would mark them pending forever. commitMessageExtra includes newDigestShort so each PR title is unique \u2014 without it, all digest PRs share the same title and Renovate disables automerge on subsequent ones thinking they were already merged. MUST be placed after the github-actions digest rule so its commitMessageExtra wins. Weekly PR (schedule before 9am on Monday, the same as the other weekly groups): .github gets commits most days, and one PR per commit in every consumer repo was 40-55 automerged PRs a week. automergeSchedule stays at any time, so the PR merges as soon as CI passes. An urgent workflow fix needs a manual merge (or the rebase checkbox) in the repos that need it.",
       "matchManagers": [
         "github-actions"
       ],
@@ -435,7 +435,7 @@
       "minimumReleaseAge": "1 minute",
       "minimumReleaseAgeBehaviour": "timestamp-optional",
       "schedule": [
-        "at any time"
+        "before 9am on monday"
       ],
       "automergeSchedule": [
         "at any time"
@@ -896,6 +896,65 @@
       "labels": [
         "dependencies",
         "manual-review"
+      ]
+    },
+    {
+      "description": "uv: one PR per uv release for every place a repository pins it: the uv image in a Dockerfile (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. After the ghcr.io override rules, which must not lose the image's lookup.",
+      "matchDepNames": [
+        "ghcr.io/astral-sh/uv",
+        "astral-sh/uv",
+        "uv_build"
+      ],
+      "groupName": "uv"
+    },
+    {
+      "description": "Third-party base-image digests (Dockerfile and compose rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR a week per repository instead of one per rebuild (45 in two months). Opened before 09:00 UTC on Monday with the other weekly groups. The trade-off: an OS fix in a base image arrives up to a week later, the same cadence as the weekly image-cve-alert scan. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds.",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "matchPackageNames": [
+        "!**/mbologna/**"
+      ],
+      "groupName": "Docker base images",
+      "schedule": [
+        "before 9am on monday"
+      ]
+    },
+    {
+      "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened before 09:00 UTC on Monday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR.",
+      "matchManagers": [
+        "npm",
+        "composer"
+      ],
+      "matchDepTypes": [
+        "devDependencies",
+        "require-dev"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "groupName": "dev tooling",
+      "schedule": [
+        "before 9am on monday"
+      ]
+    },
+    {
+      "description": "Terraform providers: one PR a week per repository, opened before 09:00 UTC on Monday. A merge deploys nothing (tofu apply is a separate step), and each provider had its own PR. Patch and minor only: a major keeps its own PR, where the repository asks for a plan before merging.",
+      "matchManagers": [
+        "terraform"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "groupName": "Terraform providers",
+      "schedule": [
+        "before 9am on monday"
       ]
     }
   ],
