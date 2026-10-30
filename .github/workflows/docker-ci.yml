@@ -356,20 +356,35 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # Retried: cosign retries its own Rekor upload, and when the first POST
+      # landed but its answer didn't, the retry gets 409 "an equivalent entry
+      # already exists" and cosign exits without attaching the signature
+      # (renovate-alert, 2026-10-29). A new attempt signs with a new ephemeral
+      # key, so it can't conflict with the orphaned entry.
       - name: Sign GHCR image
         env:
           COSIGN_EXPERIMENTAL: "true"
+          REF: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
         run: |
-          cosign sign --yes \
-            "ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}"
+          for attempt in 1 2 3; do
+            cosign sign --yes "$REF" && exit 0
+            echo "::warning::cosign sign failed (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
 
       - name: Sign Docker Hub image
         if: inputs.push_to_dockerhub
         env:
           COSIGN_EXPERIMENTAL: "true"
+          REF: ${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
         run: |
-          cosign sign --yes \
-            "${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}"
+          for attempt in 1 2 3; do
+            cosign sign --yes "$REF" && exit 0
+            echo "::warning::cosign sign failed (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
 
   integration-test:
     name: Integration Tests
