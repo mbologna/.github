@@ -583,7 +583,7 @@
       "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
-      "description": "gomod: go/ prefix, use resolved versions, include update type",
+      "description": "gomod: go/ prefix, use resolved versions, include update type. gomodTidy: without it Renovate only edits go.mod and adds the new sums, leaving the old versions' sums in go.sum, so go-ci's go mod tidy -diff failed every Go update (agent-history-viewer#12, 2026-10-30). gomodUpdateImportPaths rewrites imports on a /vN major; a major that changes the module's domain (github.com/charmbracelet to charm.land) still needs a person.",
       "matchManagers": [
         "gomod"
       ],
@@ -595,7 +595,11 @@
         "digest"
       ],
       "commitMessageTopic": "go/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
+      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})",
+      "postUpdateOptions": [
+        "gomodTidy",
+        "gomodUpdateImportPaths"
+      ]
     },
     {
       "description": "maven: maven/ prefix, use resolved versions, include update type",
