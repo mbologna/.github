@@ -1,0 +1,72 @@
+name: Go CI
+
+on:
+  workflow_call:
+    inputs:
+      go_version_file:
+        description: File setup-go reads the Go version from
+        required: false
+        type: string
+        default: go.mod
+      test_flags:
+        description: Extra flags for go test
+        required: false
+        type: string
+        default: -race
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ inputs.go_version_file }}
+
+      - name: gofmt
+        run: |
+          unformatted=$(git ls-files '*.go' | grep -v '^vendor/' | xargs -r gofmt -l)
+          if [ -n "$unformatted" ]; then
+            echo "::error::Not gofmt-formatted (run gofmt -w):"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      # go.mod and go.sum must already be what go mod tidy makes them, and a
+      # vendor/ directory must match them: a dependency update that skipped
+      # either still builds here but not from a clean checkout.
+      - name: go mod tidy
+        run: go mod tidy -diff
+
+      - name: vendor/ matches go.mod
+        if: hashFiles('vendor/modules.txt') != ''
+        run: |
+          go mod vendor
+          git diff --exit-code --stat -- vendor/
+
+  test:
+    name: Test
+    runs-on: ubuntu-26.04
+    needs: lint
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: ${{ inputs.go_version_file }}
+
+      # With a vendor/ directory, go build and go test use it on their own.
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ${{ inputs.test_flags }} ./...
