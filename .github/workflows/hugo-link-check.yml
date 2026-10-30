@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: '0.167.0'
+      dart_sass_version:
+        description: Dart Sass release to install for css.Sass with the dartsass transpiler (leave empty to skip)
+        required: false
+        type: string
+        default: ''
       fail_on_broken:
         description: Fail the job if broken links are found
         required: false
@@ -29,6 +34,22 @@ jobs:
         with:
           hugo-version: ${{ inputs.hugo_version }}
           extended: true
+
+      - name: Setup Dart Sass
+        if: inputs.dart_sass_version != ''
+        env:
+          DART_SASS_VERSION: ${{ inputs.dart_sass_version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset="dart-sass-${DART_SASS_VERSION}-linux-x64.tar.gz"
+          curl -fsSLO "https://github.com/sass/dart-sass/releases/download/${DART_SASS_VERSION}/${asset}"
+          # Dart Sass publishes no checksum file; GitHub records each asset's
+          # digest, and an empty one fails the check
+          digest=$(gh api "repos/sass/dart-sass/releases/tags/${DART_SASS_VERSION}" \
+            --jq ".assets[] | select(.name == \"${asset}\") | .digest")
+          echo "${digest#sha256:}  ${asset}" | sha256sum --check --strict
+          tar -xzf "${asset}" -C "${RUNNER_TEMP}"
+          echo "${RUNNER_TEMP}/dart-sass" >> "${GITHUB_PATH}"
 
       - name: Build
         run: hugo --minify
