@@ -899,8 +899,9 @@
       ]
     },
     {
-      "description": "uv: one PR per uv release for every place a repository pins it: the uv image in a Dockerfile (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. After the ghcr.io override rules, which must not lose the image's lookup.",
+      "description": "uv: one PR per uv release for every place a repository pins it: uv from PyPI in requirements-uv.txt (hash-pinned, installed with pip in a Dockerfile's build stage), the uv image where a Dockerfile still copies it (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. Dockerfiles take uv from PyPI because PyPI gives the release date the digest-pinned ghcr.io image lacks: that image's updates could not be age-gated and waited for a person in every repository (the date-less digest-pinned rule), while the PyPI uv waits out the usual age gate and automerges; the pip_requirements manager refreshes the hashes. After the ghcr.io override rules, which must not lose the image's lookup.",
       "matchDepNames": [
+        "uv",
         "ghcr.io/astral-sh/uv",
         "astral-sh/uv",
         "uv_build"
