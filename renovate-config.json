@@ -189,7 +189,7 @@
       ]
     },
     {
-      "description": "GitHub Actions: never auto-merge \u2014 workflow changes run with repo permissions and are a supply-chain risk",
+      "description": "GitHub Actions: never auto-merge \u2014 workflow changes run with repo permissions and are a supply-chain risk. Exception: the trusted publishers' patch, minor and digest updates further down.",
       "matchManagers": [
         "github-actions"
       ],
@@ -471,6 +471,33 @@
       "groupName": "github-actions",
       "schedule": [
         "before 9am on monday"
+      ]
+    },
+    {
+      "description": "Trusted publishers' GitHub Actions (actions/*, github/*, docker/*, astral-sh/*, google-github-actions/*, sigstore/*, peaceiris/*) automerge their patch, minor and digest updates: they are SHA-pinned, waited out the 7-day gate (digests included), and come from organisations whose release process a hijacked maintainer account alone cannot bypass. Their own weekly group, because Renovate automerges a group only if every member may: in the shared github-actions group one other publisher's update would hold them all. Majors and every other publisher stay with the manual-review rule above. Must come after the github-actions group rule so this groupName wins.",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "actions/**",
+        "github/**",
+        "docker/**",
+        "astral-sh/**",
+        "google-github-actions/**",
+        "sigstore/**",
+        "peaceiris/**"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "github-actions (trusted publishers)",
+      "automerge": true,
+      "reviewers": [],
+      "labels": [
+        "dependencies",
+        "automerge"
       ]
     },
     {
