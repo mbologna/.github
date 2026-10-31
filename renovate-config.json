@@ -913,10 +913,11 @@
       "groupName": "uv"
     },
     {
-      "description": "Third-party base-image digests (Dockerfile and compose rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy releases at once when Trivy sees fixable HIGH/CRITICAL CVEs gone, so holding it would delay CVE fixes by up to a week. Dependency-only releases are limited instead by auto-release's monthly docker refresh. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds.",
+      "description": "Third-party base-image digests (Dockerfile and compose rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy releases at once when Trivy sees fixable HIGH/CRITICAL CVEs gone, so holding it would delay CVE fixes by up to a week. Dependency-only releases are limited instead by auto-release's monthly docker refresh. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds. GitLab CI job images (gitlabci) are in the same group: docker:29 and docker:29-dind moved as two MRs, each a CI pipeline against GitLab's minute budget.",
       "matchManagers": [
         "dockerfile",
-        "docker-compose"
+        "docker-compose",
+        "gitlabci"
       ],
       "matchUpdateTypes": [
         "digest"
@@ -955,6 +956,34 @@
         "minor"
       ],
       "groupName": "Terraform providers",
+      "schedule": [
+        "before 9am on monday"
+      ]
+    },
+    {
+      "description": "pre-commit hook version bumps: one PR a week per repository, opened before 09:00 UTC on Monday, like the other tooling groups. They only change local and CI checks. Digest updates keep their own manual rule (a moved tag).",
+      "matchManagers": [
+        "pre-commit"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "pre-commit hooks",
+      "schedule": [
+        "before 9am on monday"
+      ]
+    },
+    {
+      "description": "Helm chart patch and minor updates: one PR a week per repository, opened before 09:00 UTC on Monday, instead of a chain of PRs as a chart moves 10.9.7, 10.10.3, 10.10.5 in a week. A repository whose image scanner expedites single chart PRs (infra) sets groupName null for helm and keeps the weekly schedule.",
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "Helm charts",
       "schedule": [
         "before 9am on monday"
       ]
