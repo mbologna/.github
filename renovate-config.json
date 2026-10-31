@@ -462,7 +462,7 @@
       "minimumReleaseAge": "7 days"
     },
     {
-      "description": "One weekly PR per repository for all GitHub Actions updates, majors still separate, instead of one per action and digest. They all wait for a manual merge anyway (never automerged, see above), so batching them turns a steady trickle of reviews into one a week. Since the reusable workflows were consolidated, most land in mbologna/.github. Not its own reusable workflows, which keep automerging at any time.",
+      "description": "One weekly PR per repository for all GitHub Actions updates, majors still separate, instead of one per action and digest. Those not from a trusted publisher wait for a manual merge (see above), so batching them turns a steady trickle of reviews into one a week. Since the reusable workflows were consolidated, most land in mbologna/.github. Not its own reusable workflows, which automerge in the night window.",
       "matchManagers": [
         "github-actions"
       ],
@@ -941,7 +941,7 @@
       "groupName": "uv"
     },
     {
-      "description": "Third-party base-image digests (Dockerfile and compose rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy releases at once when Trivy sees fixable HIGH/CRITICAL CVEs gone, so holding it would delay CVE fixes by up to a week. Dependency-only releases are limited instead by auto-release's monthly docker refresh. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds. GitLab CI job images (gitlabci) are in the same group: docker:29 and docker:29-dind moved as two MRs, each a CI pipeline against GitLab's minute budget.",
+      "description": "Third-party base-image digests (Dockerfile and compose rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy releases at once when Trivy sees fixable HIGH/CRITICAL CVEs gone, so holding it would delay CVE fixes by up to a week. Dependency-only rebuilds release nothing on their own: auto-release's scheduled runs use the conventional strategy. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds. GitLab CI job images (gitlabci) are in the same group: docker:29 and docker:29-dind moved as two MRs, each a CI pipeline against GitLab's minute budget.",
       "matchManagers": [
         "dockerfile",
         "docker-compose",
