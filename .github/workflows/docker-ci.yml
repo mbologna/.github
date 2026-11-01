@@ -197,6 +197,17 @@ jobs:
           pattern: digest-${{ inputs.image_name }}-*
           merge-multiple: true
 
+      # A pattern that matches nothing is not an error for download-artifact.
+      # The digests live one day (retention-days above), so re-running only this
+      # job later found none and failed on a missing /tmp/digests
+      # (thelounge-digest, 2026-11-01). Say what to do instead.
+      - name: Check the digests
+        run: |
+          if [ -z "$(ls -A /tmp/digests 2>/dev/null)" ]; then
+            echo "::error::No digest artifacts: the build jobs' digests expire after 1 day. Re-run all jobs, not only the failed ones."
+            exit 1
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
@@ -270,7 +281,24 @@ jobs:
             --format '{{json .Manifest}}' | jq -r '.digest')
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
+      # Retried once: the action downloads syft from github.com first, and a 504
+      # there failed the job after the tags were already pushed, skipping the
+      # scans, signing and release (thelounge-digest, 2026-10-26).
       - name: Generate SBOM
+        id: sbom
+        continue-on-error: true
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ steps.merge.outputs.digest }}
+          format: cyclonedx-json
+          artifact-name: sbom-${{ inputs.image_name }}.cyclonedx.json
+
+      - name: Wait before retrying the SBOM
+        if: steps.sbom.outcome == 'failure'
+        run: sleep 30
+
+      - name: Generate SBOM (retry)
+        if: steps.sbom.outcome == 'failure'
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ steps.merge.outputs.digest }}
