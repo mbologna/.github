@@ -57,7 +57,7 @@ jobs:
     # would make every caller that doesn't grant it fail at startup on its next
     # pin bump; inheriting it instead confines the failure to the dispatch.
     container:
-      image: ghcr.io/mbologna/auto-release:0.2.0@sha256:28e5487aa0c4c6132961187504e1b17e9d62bcc41ffba009169877c1e1b45ec9
+      image: ghcr.io/mbologna/auto-release:0.2.1@sha256:6c008d62c5c0be1995cdbe93a7d0db1e1f2511d20ec0bbd418a86056b0a60af2
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
