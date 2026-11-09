@@ -79,7 +79,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         if: steps.scope.outputs.validate == 'true'
         with:
-          node-version: "24"
+          node-version: "26"
 
       - name: Validate the preset and this repo's own config
         if: steps.scope.outputs.validate == 'true'
