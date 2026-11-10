@@ -38,7 +38,7 @@ jobs:
           # Pinned, so the tool that enforces the callers' exclude-newer cooldown
           # is age-gated too (Renovate tracks this input against astral-sh/uv
           # releases); unpinned, setup-uv took the newest uv, a day old.
-          version: "0.13.5"
+          version: "0.13.7"
           python-version: ${{ inputs.python_version }}
 
       # With a uv.lock, fail on a lock that no longer matches pyproject.toml
@@ -78,7 +78,7 @@ jobs:
           # Pinned, so the tool that enforces the callers' exclude-newer cooldown
           # is age-gated too (Renovate tracks this input against astral-sh/uv
           # releases); unpinned, setup-uv took the newest uv, a day old.
-          version: "0.13.5"
+          version: "0.13.7"
           python-version: ${{ inputs.python_version }}
 
       # With a uv.lock, fail on a lock that no longer matches pyproject.toml
