@@ -1067,24 +1067,14 @@
       "groupName": null
     },
     {
-      "description": "A pre-commit digest update means a release tag now points at a different commit, the signature of a hijacked tag (tj-actions/changed-files), never routine. Review by hand.",
+      "description": "A pre-commit digest update means a release tag now points at a different commit, the signature of a hijacked tag (tj-actions/changed-files). Hooks run in CI and on the laptop, so it never merges; and since the pinned commit is still the one that was reviewed, no PR is opened either: the repository stays on it, and the hook's next real release arrives as a normal, age-gated update.",
       "matchManagers": [
         "pre-commit"
       ],
       "matchUpdateTypes": [
         "digest"
       ],
-      "automerge": false,
-      "reviewers": [
-        "mbologna"
-      ],
-      "labels": [
-        "dependencies",
-        "manual-review"
-      ],
-      "prBodyNotes": [
-        "**Why this waits for you:** the hook's release tag now points at a different commit, which is how a hijacked tag looks. Find out why before merging."
-      ]
+      "enabled": false
     },
     {
       "description": "Date-less registries, digest-pinned: ghcr.io tag@sha256 pins stay on the docker datasource (parts 1-5 skip them), which resolves real image digests but gives no release dates. A version bump therefore cannot be age-gated: it opens a PR for a person to review instead of sitting in Pending Status Checks unseen. Same-tag digest updates keep the digest rules.",
