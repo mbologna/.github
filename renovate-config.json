@@ -7,7 +7,7 @@
   "prCreation": "immediate",
   "timezone": "UTC",
   "automergeSchedule": [
-    "* 0-5 * * 2,3,4"
+    "at any time"
   ],
   "pinDigests": true,
   "osvVulnerabilityAlerts": true,
@@ -453,7 +453,7 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run, so no stability window; automerge on green CI in the night window, no reviewer. 1-minute floor (not 0 days) ensures Renovate posts a stability check on every branch. timestamp-optional because github-digest SHAs carry no releaseTimestamp. commitMessageExtra includes newDigestShort so each PR title is unique (without it Renovate disables automerge on later PRs with the same title). MUST be placed after the github-actions digest rule so its commitMessageExtra wins. Weekly (Monday or Tuesday), and updateNotScheduled false: .github gets commits most days, and Renovate otherwise rebased every consumer's open pin PR after each of them, which was half of all builds on Renovate branches; now the branch moves only on the schedule days. An urgent workflow fix needs a manual merge in the repos that need it.",
+      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run, so no stability window; automerge on green CI, no reviewer. 1-minute floor (not 0 days) ensures Renovate posts a stability check on every branch. timestamp-optional because github-digest SHAs carry no releaseTimestamp. commitMessageExtra includes newDigestShort so each PR title is unique (without it Renovate disables automerge on later PRs with the same title). MUST be placed after the github-actions digest rule so its commitMessageExtra wins. Weekly (Monday or Tuesday), and updateNotScheduled false: .github gets commits most days, and Renovate otherwise rebased every consumer's open pin PR after each of them, which was half of all builds on Renovate branches; now the branch moves only on the schedule days. An urgent workflow fix needs a manual merge in the repos that need it.",
       "matchManagers": [
         "github-actions"
       ],
@@ -487,7 +487,7 @@
       "minimumReleaseAge": "7 days"
     },
     {
-      "description": "One weekly PR per repository for all GitHub Actions updates (majors still separate), opened on Monday or Tuesday and merged in the night window: patch, minor and digest updates of every publisher automerge after their age gate (patch 7 days, minor 14, digest 7), because every action is SHA-pinned and the gate gives others time to notice a hijacked release. Majors are decided at the end (trusted publishers' majors automerge after 30 days; every other publisher's wait for a person). Not mbologna/.github's own reusable workflows, which have their own weekly rule, and not the runtime version inputs (setup-python's python-version and friends), which join their language's group.",
+      "description": "One weekly PR per repository for all GitHub Actions updates (majors still separate), opened on Monday or Tuesday and merged once CI passes: patch, minor and digest updates of every publisher automerge after their age gate (patch 7 days, minor 14, digest 7), because every action is SHA-pinned and the gate gives others time to notice a hijacked release. Majors are decided at the end (trusted publishers' majors automerge after 30 days; every other publisher's wait for a person). Not mbologna/.github's own reusable workflows, which have their own weekly rule, and not the runtime version inputs (setup-python's python-version and friends), which join their language's group.",
       "matchManagers": [
         "github-actions"
       ],
@@ -821,7 +821,7 @@
       "minimumReleaseAge": "3 days"
     },
     {
-      "description": "Any image published under mbologna/ (any registry, any depth, including future ones): an own build, not an external release, so no stability wait (1 minute, not 0 days: 0 days normalises to null, no stability status is posted and automerge blocks forever). Normal automerge window. timestamp-optional because registry.gitlab.com and ghcr.io have no tag timestamps, so the gate could never be met (2026-10-12).",
+      "description": "Any image published under mbologna/ (any registry, any depth, including future ones): an own build, not an external release, so no stability wait (1 minute, not 0 days: 0 days normalises to null, no stability status is posted and automerge blocks forever). timestamp-optional because registry.gitlab.com and ghcr.io have no tag timestamps, so the gate could never be met (2026-10-12).",
       "matchPackageNames": [
         "**/mbologna/**"
       ],
@@ -938,7 +938,7 @@
       "groupName": "Docker base images"
     },
     {
-      "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened on Monday or Tuesday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR. Monday or Tuesday rather than Monday morning: the hosted GitHub app visits a quiet repository irregularly and missed a 9-hour Monday window for weeks (mail2apprise, 2026-11), and a PR opened on Tuesday still merges in that week's window.",
+      "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened on Monday or Tuesday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR. Monday or Tuesday rather than Monday morning: the hosted GitHub app visits a quiet repository irregularly and missed a 9-hour Monday window for weeks (mail2apprise, 2026-11).",
       "matchManagers": [
         "npm",
         "composer"
