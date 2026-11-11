@@ -58,7 +58,11 @@ on:
         type: boolean
         default: false
       enable_release_drafter:
-        description: Create a GitHub release on tag push
+        description: >-
+          Create a GitHub Release for a tag that has none (a tag pushed by hand),
+          with GitHub's generated notes; a tag with a '-' (v1.2.3-rc.1) becomes a
+          pre-release. auto-release creates its own Release first, so its tags
+          are left alone. The name predates the switch away from release-drafter.
         required: false
         type: boolean
         default: false
@@ -662,8 +666,10 @@ jobs:
           fetch-depth: 0
 
       # auto-release creates the Release, with its grouped notes, before it
-      # dispatches this build; release-drafter would overwrite them. Only a
-      # tag pushed by hand still gets its Release here.
+      # dispatches this build, so only a tag pushed by hand gets its Release
+      # here. release-drafter used to write these notes: it also left a draft
+      # for the next version and marked a -rc tag as a normal, latest release
+      # (bitlbee v5.1.1-rc.1, 2026-11-12).
       - name: Check for an existing release
         id: existing
         env:
@@ -674,18 +680,12 @@ jobs:
             echo "exists=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Draft release notes
-        id: notes
-        if: steps.existing.outputs.exists != 'true'
-        uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Create release
         if: steps.existing.outputs.exists != 'true'
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
-          body: ${{ steps.notes.outputs.body }}
+          generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
 
