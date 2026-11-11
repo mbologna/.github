@@ -7,7 +7,7 @@ on:
         description: Python version to use
         required: false
         type: string
-        default: "3.12"
+        default: "3.15"
       use_uv:
         description: Use uv instead of pip
         required: false
