@@ -82,6 +82,26 @@ on:
         required: false
         type: string
         default: push
+      skip_paths:
+        description: >-
+          Patterns, one per line, of files that cannot change the image (bash
+          [[ == ]] patterns: * also matches /). A pull request or branch push
+          whose changed files all match builds nothing, so a docs- or CI-only
+          change neither checks nor publishes (nor deploys, in a push-mode
+          caller) an image. Tags, schedules and manual runs always build, and so
+          does anything the compare API can't answer (a new branch, a
+          force-push, over 300 files).
+        required: false
+        type: string
+        default: |
+          .github/*
+          docs/*
+          tests/*
+          *.md
+          renovate.json
+          .pre-commit-config.yaml
+          .gitignore
+          LICENSE
       yamllint_paths:
         description: Space-separated paths for yamllint to scan
         required: false
@@ -117,6 +137,10 @@ jobs:
           PUBLISH: ${{ inputs.publish }}
           EVENT: ${{ github.event_name }}
           DEFAULT_REF: refs/heads/${{ github.event.repository.default_branch }}
+          SKIP_PATHS: ${{ inputs.skip_paths }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$PUBLISH" != push ] && [ "$PUBLISH" != release ]; then
             echo "::error::publish must be 'push' or 'release', not '${PUBLISH}'"
@@ -130,6 +154,32 @@ jobs:
             if [[ $GITHUB_REF == refs/tags/v* ]]; then push=true; else build=false; fi
           elif [[ $GITHUB_REF == refs/tags/* || $GITHUB_REF == "$DEFAULT_REF" || $EVENT == schedule ]]; then
             push=true
+          fi
+          # Only image inputs justify a build: skip it when every changed file
+          # matches skip_paths. Anything uncertain builds.
+          if [ "$build" = true ] && { [ "$EVENT" = pull_request ] || { [ "$EVENT" = push ] && [[ $GITHUB_REF == refs/heads/* ]]; }; } \
+            && [ -n "$SKIP_PATHS" ] && [ -n "$BASE" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ]; then
+            if files=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE}...${HEAD}" \
+                --jq 'if (.files | length) >= 300 then error("too many files") else .files[].filename end' 2>/dev/null); then
+              image_change=false
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                matched=false
+                while IFS= read -r pat; do
+                  [ -n "$pat" ] || continue
+                  # shellcheck disable=SC2053 # $pat is a pattern on purpose
+                  if [[ $f == $pat ]]; then matched=true; break; fi
+                done <<< "$SKIP_PATHS"
+                if [ "$matched" = false ]; then image_change=true; echo "image input changed: ${f}"; break; fi
+              done <<< "$files"
+              if [ "$image_change" = false ] && [ -n "$files" ]; then
+                echo "only files in skip_paths changed: no build"
+                build=false
+                push=false
+              fi
+            else
+              echo "could not list the changed files: building"
+            fi
           fi
           echo "publish=${PUBLISH} event=${EVENT} ref=${GITHUB_REF}: build=${build} push=${push}"
           echo "build=${build}" >> "$GITHUB_OUTPUT"
