@@ -7,7 +7,7 @@ on:
         description: PHP version
         required: false
         type: string
-        default: "8.3"
+        default: "8.5"
       php_extensions:
         description: Comma-separated list of PHP extensions to install
         required: false
