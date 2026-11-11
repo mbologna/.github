@@ -88,6 +88,14 @@ jobs:
       - name: Install dependencies
         run: composer install ${{ inputs.composer_options }}
 
+      # Renovate doesn't refresh composer.lock (Composer can't hold transitive
+      # updates to releases at least 7 days old), so a vulnerable transitive
+      # package has to show up here: it turns CI red, and the scheduled run
+      # catches advisories published between pushes. require-dev is left out,
+      # since the images install with --no-dev.
+      - name: Audit the lock file
+        run: composer audit --locked --no-dev --abandoned=report
+
       - name: Pre-test setup
         if: inputs.pre_test_command != ''
         run: ${{ inputs.pre_test_command }}
