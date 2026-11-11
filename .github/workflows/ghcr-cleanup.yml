@@ -15,7 +15,7 @@ jobs:
         package:
           - bitlbee
           - stunnel
-          # Former names, still published until 2027-05-11 (legacy_image_names).
+          # Former names, still published through legacy_image_names.
           - docker-bitlbee
           - docker-stunnel
           - reddit-rss-fetcher
