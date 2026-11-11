@@ -7,6 +7,16 @@ on:
         description: Docker image name (without registry prefix)
         required: true
         type: string
+      legacy_image_names:
+        description: >-
+          Optional comma-separated former names of the image (e.g. docker-bitlbee).
+          Every build also pushes, signs and cleans them, with the same tags and
+          digest, so users of a renamed image keep getting updates: neither GHCR
+          nor Docker Hub redirects a renamed repository. Remove it when the
+          deprecation window ends.
+        required: false
+        type: string
+        default: ""
       dockerfile:
         description: Dockerfile path, relative to the repository root
         required: false
@@ -249,15 +259,30 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "major=${version%%.*}" >> "$GITHUB_OUTPUT"
 
+      - name: List image names
+        id: images
+        env:
+          OWNER: ${{ github.repository_owner }}
+          NAMES: ${{ inputs.image_name }},${{ inputs.legacy_image_names }}
+          DOCKERHUB_USER: ${{ inputs.push_to_dockerhub && secrets.DOCKER_USERNAME || '' }}
+        run: |
+          set -euo pipefail
+          IFS=', ' read -ra names <<< "$NAMES"
+          {
+            echo 'list<<EOF'
+            for name in "${names[@]}"; do
+              [ -n "$name" ] || continue
+              echo "ghcr.io/${OWNER}/${name}"
+              if [ -n "$DOCKERHUB_USER" ]; then echo "${DOCKERHUB_USER}/${name}"; fi
+            done
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
-        env:
-          DOCKERHUB_IMAGE: ${{ format('{0}/{1}', secrets.DOCKER_USERNAME, inputs.image_name) }}
         with:
-          images: |
-            ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}
-            ${{ inputs.push_to_dockerhub && env.DOCKERHUB_IMAGE || '' }}
+          images: ${{ steps.images.outputs.list }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-
@@ -392,27 +417,39 @@ jobs:
       - name: Sign GHCR image
         env:
           COSIGN_EXPERIMENTAL: "true"
-          REF: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
+          REPO: ghcr.io/${{ github.repository_owner }}
+          NAMES: ${{ inputs.image_name }},${{ inputs.legacy_image_names }}
+          DIGEST: ${{ needs.merge.outputs.digest }}
         run: |
-          for attempt in 1 2 3; do
-            cosign sign --yes "$REF" && exit 0
-            echo "::warning::cosign sign failed (attempt $attempt of 3)"
-            sleep $((attempt * 20))
+          IFS=', ' read -ra names <<< "$NAMES"
+          for name in "${names[@]}"; do
+            [ -n "$name" ] || continue
+            for attempt in 1 2 3; do
+              cosign sign --yes "${REPO}/${name}@${DIGEST}" && continue 2
+              echo "::warning::cosign sign of ${name} failed (attempt $attempt of 3)"
+              sleep $((attempt * 20))
+            done
+            exit 1
           done
-          exit 1
 
       - name: Sign Docker Hub image
         if: inputs.push_to_dockerhub
         env:
           COSIGN_EXPERIMENTAL: "true"
-          REF: ${{ secrets.DOCKER_USERNAME }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
+          REPO: ${{ secrets.DOCKER_USERNAME }}
+          NAMES: ${{ inputs.image_name }},${{ inputs.legacy_image_names }}
+          DIGEST: ${{ needs.merge.outputs.digest }}
         run: |
-          for attempt in 1 2 3; do
-            cosign sign --yes "$REF" && exit 0
-            echo "::warning::cosign sign failed (attempt $attempt of 3)"
-            sleep $((attempt * 20))
+          IFS=', ' read -ra names <<< "$NAMES"
+          for name in "${names[@]}"; do
+            [ -n "$name" ] || continue
+            for attempt in 1 2 3; do
+              cosign sign --yes "${REPO}/${name}@${DIGEST}" && continue 2
+              echo "::warning::cosign sign of ${name} failed (attempt $attempt of 3)"
+              sleep $((attempt * 20))
+            done
+            exit 1
           done
-          exit 1
 
   integration-test:
     name: Integration Tests
@@ -457,8 +494,9 @@ jobs:
           # which must pass the action's safe-regex2 check: no nested
           # quantifiers. package stays the plain name: the action logs in to
           # the registry with it, and an anchored ^name$ failed that login.
-          # Image names here have no regex metacharacters.
-          package: ${{ inputs.image_name }}
+          # Image names here have no regex metacharacters. A comma list
+          # cleans the legacy names too.
+          package: ${{ inputs.legacy_image_names && format('{0},{1}', inputs.image_name, inputs.legacy_image_names) || inputs.image_name }}
           keep-n-tagged: 5
           delete-untagged: true
           # Concurrent runs push untagged per-arch digests that their merge job
