@@ -12,8 +12,8 @@ on:
           Optional comma-separated former names of the image (e.g. docker-bitlbee).
           Every build also pushes, signs and cleans them, with the same tags and
           digest, so users of a renamed image keep getting updates: neither GHCR
-          nor Docker Hub redirects a renamed repository. Remove it when the
-          deprecation window ends.
+          nor Docker Hub redirects a renamed repository. Keep it for as long as
+          the old names should get updates.
         required: false
         type: string
         default: ""
