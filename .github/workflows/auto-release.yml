@@ -24,6 +24,14 @@ on:
         required: false
         type: string
         default: ""
+      dockerfiles:
+        description: >-
+          Dockerfiles whose base images the security strategy compares,
+          separated by spaces or commas (e.g. "Dockerfile-master
+          Dockerfile-minion"); empty means auto-release's default, Dockerfile
+        required: false
+        type: string
+        default: ""
       base_image_pattern:
         description: Extended regex; matching Dockerfile lines go into every release's notes
         required: false
@@ -75,6 +83,7 @@ jobs:
           AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
           AUTO_RELEASE_DISPATCH: ${{ inputs.dispatch_tag_build }}
           AUTO_RELEASE_DRY_RUN: ${{ inputs.dry_run }}
+          DOCKERFILES: ${{ inputs.dockerfiles }}
           # In a called workflow, github.workflow_ref is the caller's:
           # owner/repo/.github/workflows/ci.yml@refs/heads/main
           AUTO_RELEASE_DISPATCH_WORKFLOW: ${{ inputs.dispatch_workflow || github.workflow_ref }}
@@ -88,7 +97,11 @@ jobs:
         # The 'docker' strategy (release on any image digest change) is
         # retired; a caller still passing it gets 'conventional' and a
         # warning until it is updated.
+        #
+        # AUTO_RELEASE_DOCKERFILES is exported only when the caller sets it, so
+        # an empty input leaves auto-release's own default in charge.
         run: |
+          if [ -n "$DOCKERFILES" ]; then export AUTO_RELEASE_DOCKERFILES="$DOCKERFILES"; fi
           scheduled=$STRATEGY
           if [ "$scheduled" = docker ]; then
             echo "::warning::strategy 'docker' is retired and runs as 'conventional'; pass strategy: conventional"
