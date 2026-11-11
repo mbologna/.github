@@ -369,6 +369,16 @@
       ]
     },
     {
+      "description": "npm engines (package.json engines.node): a compatibility floor, not a dependency. Renovate raised thelounge-plugin-apprise-push's engines.node from >=18.20.8 to >=24.21.0 (#67) when no code needed it, and `thelounge install` refuses a package whose engines its Node (22) doesn't meet, so no release from 1.3.0 on could be installed. A person raises the floor when the code needs a newer runtime.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "engines"
+      ],
+      "enabled": false
+    },
+    {
       "description": "composer: composer/ prefix, from/to resolved versions and update type",
       "matchManagers": [
         "composer"
