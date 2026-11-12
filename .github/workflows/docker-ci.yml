@@ -354,6 +354,12 @@ jobs:
           # Scoped per image: a repository may call this workflow once per image.
           cache-from: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }}
           cache-to: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }},mode=max
+          # A release builds from scratch: with the cache, apk/apt layers came back
+          # unchanged and a security release shipped the same packages (auto-release
+          # 0.3.1 had 0.3.0's digest, 12 fixable HIGH findings and all). Pull
+          # requests and branch builds keep the cache.
+          no-cache: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          pull: ${{ startsWith(github.ref, 'refs/tags/v') }}
           provenance: false
           sbom: false
 
