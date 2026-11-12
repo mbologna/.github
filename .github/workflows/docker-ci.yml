@@ -324,6 +324,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Where the image came from, which commit, and on a release tag which
+      # version: the standard's OCI labels (README, "Container images"),
+      # set here so no Dockerfile has to repeat them.
+      - name: Image labels
+        id: labels
+        if: needs.lint.outputs.build == 'true'
+        run: |
+          {
+            echo 'labels<<EOF'
+            echo "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+            echo "org.opencontainers.image.revision=${GITHUB_SHA}"
+            if [ "$GITHUB_REF_TYPE" = tag ]; then
+              echo "org.opencontainers.image.version=${GITHUB_REF_NAME#v}"
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build & Push (by digest)
         id: build
         if: needs.lint.outputs.build == 'true'
@@ -332,6 +349,7 @@ jobs:
           context: .
           file: ${{ inputs.dockerfile }}
           platforms: ${{ matrix.platform }}
+          labels: ${{ steps.labels.outputs.labels }}
           outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }},push-by-digest=true,name-canonical=true,push=${{ needs.lint.outputs.push }}
           # Scoped per image: a repository may call this workflow once per image.
           cache-from: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }}
