@@ -17,10 +17,10 @@ GitLab:
 
 | Event | What runs |
 |---|---|
-| Pull request | Title check (a Conventional Commit, since the squash-merge subject is the PR title and auto-release reads it). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
+| Pull request | Title check (a Conventional Commit, since the squash-merge subject is the PR title and auto-release reads it). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push and the image policy check, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
 | Push to the default branch | Security check only: auto-release's `security` strategy releases a CVE fix at once, including a fresh rebuild when the last release is a week old and its image has fixable findings in packages it installs on top of its base. Nothing is built, except with `publish: push` (the Cloud Run repositories, which deploy every push that changes the image). |
 | Monday 06:00 UTC schedule | Conventional release: auto-release tags `vX.Y.Z` when a `feat`, `fix`, `perf`, `revert` or breaking commit landed since the last tag, or a fresh rebuild is due. |
-| Release tag `vX.Y.Z` | Build and push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
+| Release tag `vX.Y.Z` | Build, the image policy check, and push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
 
 What differs from GitLab, on purpose:
 
@@ -100,31 +100,49 @@ purges the compilers the official `php` image keeps for
 `docker-php-ext-install`. Apache listens on `${PORT}` from its config, so
 it runs as `www-data` (UID 33) without editing `/etc` at start.
 
-Exceptions, each explained in its Dockerfile or README:
+### Image policy check
 
-- **CI job images** (auto-release) run as root and ship git, curl, crane,
-  git-cliff, jq and trivy: GitHub's `container:` and GitLab's `image:` run
-  the job as the image's user and write the checked-out workspace, and those
-  tools are the job.
-- **Images built on another project's runtime image** keep that image's user
-  model. linuxserver.io images start s6-overlay as root and drop to
-  `PUID`/`PGID`; when their tag comes from linuxserver's releases, a
-  datasource that can't look up digests, they are pinned by tag
-  (linuxserver never re-pushes an `-lsN` tag).
-- **bitlbee-container**: s6-overlay runs as root as PID 1 to supervise the
-  services, and each service runs as UID 1000 (`s6-setuidgid`);
-  `--user 1000:1000` runs the whole container unprivileged. It builds on
-  `buildpack-deps` and runs on `debian:stable-slim`, the same Debian release.
-- **saltstack-container** (test fixtures for salt-netapi-client): the minion
-  applies states as root, and the master's salt-api authenticates a PAM user
-  from `/etc/shadow`.
+Every build checks two of these rules on the image it just built, without
+running it, and fails when one is broken: a pull request's build, and a
+release build before anything tags the image. On GitHub it is the last
+step of each `Build (<platform>)` job of docker-ci; on GitLab, part of
+kaniko-build's `<job_name>-check` (merge requests) and `<job_name>`
+(release tags, before the push) jobs. The check reads the layers and the
+config from an OCI layout of the image, so it costs seconds.
 
-To check an image by hand, this should print a non-root UID and no
-paths, outside the exceptions:
+- **No build or fetch tools on the binary paths.** None of `pip`, `pip3`,
+  `pip3.*`, `uv`, `uvx`, `npm`, `npx`, `corepack`, `yarn`, `pnpm`,
+  `composer`, `gcc`, `cc`, `g++`, `c++`, `clang`, `make` or `git` in
+  `/usr/bin`, `/usr/local/bin`, `/bin`, `/sbin`, `/usr/sbin`,
+  `/usr/local/sbin` or a virtualenv's `bin` (`/opt/venv/bin`, any
+  `venv/bin` or `.venv/bin`), after later layers' deletions. A tool inside
+  the application's own tree (`node_modules/.bin`, a bundled package
+  manager under the install directory) doesn't count.
+- **Not root.** The image config's `User` must not be empty, `root` or
+  UID `0` (`0`, `0:0`, `root:…`).
 
-```sh
-docker run --rm --entrypoint sh <image> -c 'id; command -v pip uv npm composer gcc git'
-```
+The log lists each tool it found and where, and the user. An exception is
+an input of the calling workflow or component, with the reason in the
+Dockerfile or README:
+
+- `allowed_tools`: the tools the application runs, separated by spaces or
+  commas (`allowed_tools: git`).
+- `allow_root`: why the image runs as root, as a sentence. The check
+  prints it and passes.
+
+Declared exceptions, on both forges:
+
+| Image | `allowed_tools` | `allow_root` | Why |
+|---|---|---|---|
+| auto-release | `git` | yes | A CI job image: GitHub's `container:` and GitLab's `image:` run the job as the image's user and write the checked-out workspace; git (tags, history) is the job. Its curl, crane, git-cliff, jq and trivy aren't on the list. |
+| bitlbee-container | | yes | s6-overlay runs as root as PID 1 to supervise the services, and each service drops to UID 1000 (`s6-setuidgid`); `--user 1000:1000` runs it unprivileged. |
+| saltstack-container (master, minion) | | yes | Test fixtures for salt-netapi-client: the minion applies states as root, and the master's salt-api authenticates a PAM user from `/etc/shadow`. |
+| Images built on a linuxserver.io image (GitLab) | `git` | yes | linuxserver's s6-overlay starts as root and drops to `PUID`/`PGID`, and its base image ships git for the application. |
+
+One more exception, to the pinning rule: images built on a linuxserver.io
+image whose tag comes from linuxserver's releases, a datasource that can't
+look up digests, are pinned by tag (linuxserver never re-pushes an `-lsN`
+tag).
 
 ## Reusable workflows
 
@@ -134,7 +152,8 @@ require, so job names don't change.
 ### docker-ci.yml
 
 Lint (hadolint, yamllint), a native per-platform build (`Build (linux/amd64)`,
-`Build (linux/arm64)`), the multi-arch manifest, SBOM, Trivy, cosign, an
+`Build (linux/arm64)`) that ends with the image policy check, the multi-arch
+manifest, SBOM, Trivy, cosign, an
 optional integration test and GHCR cleanup. Optionally runs `auto-release.yml`
 and `gcp-deploy.yml` as nested jobs.
 
@@ -144,6 +163,8 @@ and `gcp-deploy.yml` as nested jobs.
 | `publish` | `push` | `release`: only `v*` tags push, and `latest` goes to the newest release. `push`: the default branch, schedules and tags push (the Cloud Run repositories) |
 | `skip_paths` | `.github/*`, `docs/*`, `tests/*`, `*.md`, `renovate.json`, `.pre-commit-config.yaml`, `.gitignore`, `LICENSE` | A pull request or branch push whose changed files all match builds nothing |
 | `dockerfile` | `Dockerfile` | Dockerfile path |
+| `allowed_tools` | empty | Tools the image policy check lets the image keep on its binary paths, separated by spaces or commas (see [Container images](#container-images)) |
+| `allow_root` | empty | Why the image runs as root; non-empty lets the image policy check pass a root image and prints the reason |
 | `legacy_image_names` | empty | Former image names that keep getting the same tags |
 | `version_command` | empty | Command run in the image that prints a version to tag |
 | `extra_tags` | empty | Extra docker/metadata-action tag rules |
