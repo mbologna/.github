@@ -56,7 +56,10 @@ on:
 
 jobs:
   ci:
-    name: PHP ${{ inputs.php_version }}
+    # A fixed name: rulesets require this check, and a name with the PHP
+    # version in it changed with every php_version bump, which then waited
+    # forever for a check that no longer existed.
+    name: Test
     runs-on: ubuntu-26.04
     if: inputs.enable_test
     permissions:
