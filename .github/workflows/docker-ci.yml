@@ -22,6 +22,24 @@ on:
         required: false
         type: string
         default: Dockerfile
+      allowed_tools:
+        description: >-
+          Tools the image policy check lets the final image keep on its binary
+          paths (pip, uv, npm, composer, compilers, make, git and the like),
+          separated by spaces or commas, for an image whose application runs
+          them. Say why in the Dockerfile or README.
+        required: false
+        type: string
+        default: ""
+      allow_root:
+        description: >-
+          Why the image runs as root, when it must (an s6-overlay PID 1 that
+          drops privileges per service, a CI job image). Non-empty lets the
+          image policy check pass an image whose config User is empty, root or
+          0, and prints the reason; empty fails such an image.
+        required: false
+        type: string
+        default: ""
       version_command:
         description: >-
           Optional shell command run inside the built image (linux/amd64) that prints
@@ -350,7 +368,11 @@ jobs:
           file: ${{ inputs.dockerfile }}
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.labels.outputs.labels }}
-          outputs: type=image,name=ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }},push-by-digest=true,name-canonical=true,push=${{ needs.lint.outputs.push }}
+          # The second output is the same image as an OCI layout directory,
+          # for the image policy check below.
+          outputs: |
+            type=image,name=ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }},push-by-digest=true,name-canonical=true,push=${{ needs.lint.outputs.push }}
+            type=oci,dest=${{ runner.temp }}/image-oci,tar=false
           # Scoped per image: a repository may call this workflow once per image.
           cache-from: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }}
           cache-to: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }},mode=max
@@ -362,6 +384,180 @@ jobs:
           pull: ${{ startsWith(github.ref, 'refs/tags/v') }}
           provenance: false
           sbom: false
+
+      # The standard's runtime rules (README, "Container images"), checked on
+      # the image this job just built, before anything tags it: a pull
+      # request fails here, and a release build that fails never reaches the
+      # merge job, so no tag points at it. Reads the layers and the config
+      # from the OCI layout; nothing in the image runs.
+      - name: Image policy
+        if: needs.lint.outputs.build == 'true'
+        shell: sh {0}
+        env:
+          IMAGE_POLICY_LAYOUT: ${{ runner.temp }}/image-oci
+          IMAGE_POLICY_ALLOWED_TOOLS: ${{ inputs.allowed_tools }}
+          IMAGE_POLICY_ALLOW_ROOT: ${{ inputs.allow_root }}
+          IMAGE_POLICY_DOCS: https://github.com/mbologna/.github#image-policy-check
+        run: |
+          # Image policy: checks the built image, without running it, against the
+          # container image standard: no package manager, compiler or git on the
+          # binary paths, and a non-root user. POSIX sh with tar, gzip, awk, sed, od
+          # and sort, so the same code runs on a GitHub runner and in kaniko's
+          # busybox, and in mbologna/.github's docker-ci and ci-templates' kaniko-build.
+          #   IMAGE_POLICY_LAYOUT         the image, as an OCI image layout directory
+          #   IMAGE_POLICY_ALLOWED_TOOLS  tools the image may keep (space or comma list)
+          #   IMAGE_POLICY_ALLOW_ROOT     non-empty: the reason the image runs as root
+          #   IMAGE_POLICY_DOCS           where the standard is written down
+          set -eu
+          layout=$IMAGE_POLICY_LAYOUT
+          allowed=$(printf '%s' "${IMAGE_POLICY_ALLOWED_TOOLS:-}" | tr ',' ' ')
+          allow_root=${IMAGE_POLICY_ALLOW_ROOT:-}
+
+          # Flattens JSON into one "path=value" line per scalar (0.Layers.2=...,
+          # config.User=...).
+          json_flat() {
+            awk '
+              { s = s $0 "\n" }
+              END {
+                n = length(s); d = 0
+                for (i = 1; i <= n; i++) {
+                  c = substr(s, i, 1)
+                  if (c == "\"") {
+                    v = ""
+                    for (i++; i <= n; i++) {
+                      c = substr(s, i, 1)
+                      if (c == "\\") { i++; v = v substr(s, i, 1); continue }
+                      if (c == "\"") break
+                      v = v c
+                    }
+                    j = i + 1
+                    while (substr(s, j, 1) ~ /[ \t\r\n]/) j++
+                    if (d > 0 && t[d] == "o" && substr(s, j, 1) == ":") { k[d] = v; i = j }
+                    else emit(v)
+                  } else if (c == "{") { d++; t[d] = "o"; k[d] = "" }
+                  else if (c == "[") { d++; t[d] = "a"; x[d] = 0 }
+                  else if (c == "}" || c == "]") d--
+                  else if (c == ",") { if (t[d] == "a") x[d]++ }
+                  else if (c !~ /[ \t\r\n:]/) {
+                    v = c
+                    while (substr(s, i + 1, 1) !~ /[],} \t\r\n]/ && i < n) { i++; v = v substr(s, i, 1) }
+                    emit(v)
+                  }
+                }
+              }
+              function emit(v,   p, m) {
+                p = ""
+                for (m = 1; m <= d; m++) p = p (m > 1 ? "." : "") (t[m] == "o" ? k[m] : x[m])
+                print p "=" v
+              }'
+          }
+
+          blob() { printf '%s/blobs/%s' "$layout" "$(printf '%s' "$1" | tr ':' '/')"; }
+
+          # index.json names the image manifest, possibly through an index.
+          manifest=$(json_flat < "$layout/index.json")
+          depth=0
+          while :; do
+            digest=$(printf '%s\n' "$manifest" | sed -n 's/^manifests\.0\.digest=//p')
+            [ -n "$digest" ] || break
+            depth=$((depth + 1))
+            if [ "$depth" -gt 3 ]; then echo "image-policy: no image manifest in $layout" >&2; exit 1; fi
+            manifest=$(json_flat < "$(blob "$digest")")
+          done
+          config=$(printf '%s\n' "$manifest" | sed -n 's/^config\.digest=//p')
+          layers=$(printf '%s\n' "$manifest" | sed -n 's/^layers\.[0-9]*\.digest=//p')
+          if [ -z "$config" ]; then echo "image-policy: no image config in $layout" >&2; exit 1; fi
+          user=$(json_flat < "$(blob "$config")" | sed -n 's/^config\.User=//p')
+
+          # Every layer's file list, in order, an empty line before each layer.
+          list_layers() {
+            for layer in $layers; do
+              echo
+              file=$(blob "$layer")
+              magic=$(head -c 4 "$file" | od -An -tx1 | tr -d ' \n')
+              case "$magic" in
+                1f8b*) gzip -dc "$file" | tar -tf - ;;
+                28b52ffd)
+                  echo "image-policy: layer $layer is zstd-compressed, which this check can't read" >&2
+                  return 1
+                  ;;
+                *) tar -tf "$file" ;;
+              esac
+            done
+          }
+
+          # The tools left in the final filesystem: a whiteout (.wh.<name>) or an
+          # opaque directory (.wh..wh..opq) in a later layer removes what lower layers
+          # put there.
+          found=$(list_layers | awk -v allowed="$allowed" '
+            function flush(p) { for (p in add) have[p] = 1; split("", add) }
+            function drop(prefix, exact,   p) {
+              for (p in have) if (p == exact || index(p, prefix) == 1) delete have[p]
+            }
+            BEGIN { split(allowed, a, " "); for (i in a) ok[a[i]] = 1 }
+            $0 == "" { flush(); next }
+            {
+              p = $0
+              sub(/^\.\//, "", p); sub(/^\//, "", p); sub(/\/$/, "", p)
+              base = p; dir = ""
+              if (match(p, /.*\//)) { dir = substr(p, 1, RLENGTH - 1); base = substr(p, RLENGTH + 1) }
+              if (base == ".wh..wh..opq") { drop(dir "/", "\001"); next }
+              if (substr(base, 1, 4) == ".wh.") {
+                target = (dir == "" ? "" : dir "/") substr(base, 5)
+                drop(target "/", target); next
+              }
+              if (dir !~ /^(bin|sbin|usr\/bin|usr\/sbin|usr\/local\/bin|usr\/local\/sbin|opt\/venv\/bin)$/ && dir !~ /(^|\/)\.?venv\/bin$/) next
+              if (base ~ /^(pip|pip3|pip3\..+|uv|uvx|npm|npx|corepack|yarn|pnpm|composer|gcc|cc|g[+][+]|c[+][+]|clang|make|git)$/) add[p] = 1
+            }
+            END {
+              flush()
+              for (p in have) {
+                base = p; sub(/.*\//, "", base)
+                print (base in ok ? "allowed" : "found") " /" p " " base
+              }
+            }' | sort)
+
+          status=0
+          echo "Image policy (${IMAGE_POLICY_DOCS:-the container image standard}):"
+          if [ -n "$found" ]; then
+            printf '%s\n' "$found" | while read -r kind path tool; do
+              if [ "$kind" = allowed ]; then
+                echo "  allowed  $path ($tool is in allowed_tools)"
+              else
+                echo "  FAIL     $path: $tool doesn't belong in a runtime image"
+              fi
+            done
+          fi
+          bad=$(printf '%s\n' "$found" | awk '$1 == "found" { print $3 }' | sort -u | tr '\n' ' ')
+          if [ -n "$bad" ]; then
+            status=1
+            echo "  Remove these from the final stage (build them in an earlier stage), or,"
+            echo "  when the application runs them, declare them with the allowed_tools input:"
+            echo "    allowed_tools: \"${allowed:+$allowed }${bad% }\""
+            echo "  and say why in the Dockerfile or README."
+          elif [ -z "$found" ]; then
+            echo "  ok       no package manager, compiler or git on the binary paths"
+          fi
+
+          uid=${user%%:*}
+          shown=${user:-unset}
+          case "$uid" in
+            "" | root | 0)
+              if [ -n "$allow_root" ]; then
+                echo "  allowed  user '${shown}' runs as root: ${allow_root}"
+              else
+                status=1
+                echo "  FAIL     user '${shown}' (the image config's User) runs as root."
+                echo "  Add USER with a fixed numeric UID to the final stage, or, when the image"
+                echo "  must start as root, set the allow_root input to the reason."
+              fi
+              ;;
+            *) echo "  ok       user '${user}'" ;;
+          esac
+          if [ "$status" != 0 ] && [ "${GITHUB_ACTIONS:-}" = true ]; then
+            echo "::error title=Image policy::The image breaks the container image standard; see this step's log for what and how to declare an exception."
+          fi
+          exit "$status"
 
       - name: Export digest
         if: needs.lint.outputs.push == 'true'
