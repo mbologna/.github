@@ -13,11 +13,6 @@ on:
         required: false
         type: string
         default: "1.13.8"
-      enable_terraform_docs:
-        description: Auto-update README with terraform-docs
-        required: false
-        type: boolean
-        default: false
       enable_shellcheck:
         description: Run ShellCheck on shell scripts
         required: false
@@ -166,28 +161,6 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           skip-dirs: ".terraform,example/.terraform"
-
-  terraform-docs:
-    name: terraform-docs
-    runs-on: ubuntu-26.04
-    if: inputs.enable_terraform_docs
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-
-      - name: Update README with terraform-docs
-        uses: terraform-docs/gh-actions@6de6da0cefcc6b4b7a5cbea4d79d97060733093c # v1
-        with:
-          working-dir: ${{ inputs.working_dir }}
-          output-file: README.md
-          output-method: inject
-          config-file: .terraform-docs.yml
-          git-push: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'renovate[bot]') }}
-          fail-on-diff: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-          git-commit-message: "docs: auto-update README variables via terraform-docs [skip ci]"
 
   shellcheck:
     name: ShellCheck
