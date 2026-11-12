@@ -71,6 +71,63 @@ jobs:
 plus a `pr-title.yml` that calls `pr-title.yml` on `pull_request`
 (`types: [opened, edited, synchronize, reopened]`).
 
+## Container images
+
+One standard for every image built here and in the GitLab projects: the
+runtime image carries only what the application needs to run. Each package
+left in it is one more thing to patch, one more scanner finding, and one
+more tool for whoever gets a shell in the container.
+
+| Rule | Why |
+|---|---|
+| **Pinned bases.** `FROM image:tag@sha256:…`, from the official or upstream image; Renovate moves tag and digest. A language's build and runtime stages use the same digest. | The build is reproducible, auto-release's security strategy compares base images exactly, and compiled extensions match the runtime they run on. |
+| **Multi-stage.** Compilers, build headers, package managers, git and curl exist only in the build stage. The runtime stage holds the language runtime, the application, its locked dependencies, and the OS packages the application executes. No pip, uv, npm, npx, corepack, yarn or composer, no compiler, no VCS. | Nothing to fetch or build code with at run time, and no CVEs in tools that never run (pip's vendored packages, npm's bundled dependencies). |
+| **Locked dependencies, dev excluded.** Hash- or integrity-checked lock files: `uv sync --locked --no-dev`, `npm ci --omit=dev`, `composer install --no-dev --classmap-authoritative` from `composer.lock`, `go.sum`. | The image runs what CI tested. A changed or substituted artifact fails the build. |
+| **Smallest base that works.** Static binaries (Go, Rust) on `scratch` or `gcr.io/distroless/static`. Interpreted runtimes on the upstream `-alpine` variant, or `-slim` when a dependency needs glibc. | Distroless doesn't ship the Python, PHP and Node versions we run, so the upstream slim or alpine image is the smallest supported choice. |
+| **Non-root.** `USER` with a fixed numeric UID. Files root-owned and not writable by that user unless the application writes there. No setuid binaries added. Runtime writes go to a volume or `/tmp`, so the deployment can set `readOnlyRootFilesystem`. | A compromised process can't rewrite its own code or the OS. A numeric UID lets Kubernetes enforce `runAsNonRoot`. |
+| **Clean context and layers.** A `.dockerignore`. No secrets in any layer (`RUN --mount=type=secret` for build secrets, nothing generated at build time that must stay private). No `ADD <url>`: downloads check a pinned checksum, or the checksum the upstream publishes next to the file when Renovate moves the version. | Layers can't be edited after the fact, and a public image is public. |
+| **Labelled, scanned, signed.** The pipeline sets `org.opencontainers.image.source`, `.revision` and, on releases, `.version`; release builds get a Trivy report and a cosign signature (see the contract above). | Anyone can tell where an image came from, what it contains, and that this pipeline built it. |
+
+Python images share one pattern: a build stage runs a pinned uv,
+`uv sync --locked --no-dev --no-editable` into `/opt/venv` from
+`pyproject.toml` and `uv.lock`, with bytecode compiled. The runtime stage
+is the same `python:<version>-alpine` or `-slim` digest with `/opt/venv`
+copied in, pip and ensurepip removed, a non-root UID, and the entry point
+from the virtualenv.
+
+PHP images build `vendor/` in a composer stage, and their runtime stage
+purges the compilers the official `php` image keeps for
+`docker-php-ext-install`. Apache listens on `${PORT}` from its config, so
+it runs as `www-data` (UID 33) without editing `/etc` at start.
+
+Exceptions, each explained in its Dockerfile or README:
+
+- **CI job images** (auto-release) run as root and ship git, curl, crane,
+  git-cliff, jq and trivy: GitHub's `container:` and GitLab's `image:` run
+  the job as the image's user and write the checked-out workspace, and those
+  tools are the job.
+- **Images built on another project's runtime image** keep that image's user
+  model. linuxserver.io images start s6-overlay as root and drop to
+  `PUID`/`PGID`; when their tag comes from linuxserver's releases, a
+  datasource that can't look up digests, they are pinned by tag
+  (linuxserver never re-pushes an `-lsN` tag).
+- **bitlbee-container**: s6-overlay runs as root as PID 1 to supervise the
+  services, and each service runs as UID 1000 (`s6-setuidgid`);
+  `--user 1000:1000` runs the whole container unprivileged. It builds on
+  `buildpack-deps` and runs on `debian:stable-slim`, the same Debian release.
+- **saltstack-container** (test fixtures for salt-netapi-client): the minion
+  applies states as root, and the master's salt-api authenticates a PAM user
+  from `/etc/shadow`.
+- **apple-release-notifier** stays root until non-root is tested against
+  the Cloud Storage FUSE volume its Cloud Run job keeps its state on.
+
+To check an image by hand, this should print a non-root UID and no
+paths, outside the exceptions:
+
+```sh
+docker run --rm --entrypoint sh <image> -c 'id; command -v pip uv npm composer gcc git'
+```
+
 ## Reusable workflows
 
 Check names (`<caller job> / <job name>`) are what the repositories' rulesets
