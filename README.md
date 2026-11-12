@@ -118,8 +118,6 @@ Exceptions, each explained in its Dockerfile or README:
 - **saltstack-container** (test fixtures for salt-netapi-client): the minion
   applies states as root, and the master's salt-api authenticates a PAM user
   from `/etc/shadow`.
-- **apple-release-notifier** stays root until non-root is tested against
-  the Cloud Storage FUSE volume its Cloud Run job keeps its state on.
 
 To check an image by hand, this should print a non-root UID and no
 paths, outside the exceptions:
