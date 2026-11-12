@@ -1,5 +1,9 @@
 name: Python CI
 
+# uv only: every caller has a pyproject.toml and a uv.lock. The steps match
+# the GitLab python-test component: uv sync --locked, ruff check, ruff
+# format --check, pytest, then pip-audit on the runtime dependencies.
+
 on:
   workflow_call:
     inputs:
@@ -8,16 +12,18 @@ on:
         required: false
         type: string
         default: "3.15"
-      use_uv:
-        description: Use uv instead of pip
-        required: false
-        type: boolean
-        default: false
       enable_codecov:
         description: Upload coverage to Codecov
         required: false
         type: boolean
         default: true
+      pip_audit_version:
+        description: >-
+          pip-audit version for the dependency audit. Renovate tracks this
+          default (PyPI pip-audit), so a caller should not set it.
+        required: false
+        type: string
+        default: "2.10.1"
 
 jobs:
   lint:
@@ -29,7 +35,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up uv
-        if: inputs.use_uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           # Pinned, so the tool that enforces the callers' exclude-newer cooldown
@@ -38,26 +43,15 @@ jobs:
           version: "0.13.7"
           python-version: ${{ inputs.python_version }}
 
-      # With a uv.lock, fail on a lock that no longer matches pyproject.toml
-      # instead of quietly re-locking (uv sync / uv run read UV_LOCKED).
-      - name: Require an up-to-date uv.lock
-        if: inputs.use_uv
-        run: if [ -f uv.lock ]; then echo "UV_LOCKED=1" >> "$GITHUB_ENV"; fi
-
-      - name: Set up Python
-        if: '!inputs.use_uv'
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
-        with:
-          python-version: ${{ inputs.python_version }}
-
-      - name: Install ruff (pip)
-        if: '!inputs.use_uv'
-        run: pip install ruff
+      # Fail on a uv.lock that no longer matches pyproject.toml instead of
+      # quietly re-locking.
+      - name: Install dependencies
+        run: uv sync --locked
 
       - name: Lint
         run: |
-          ${{ inputs.use_uv && 'uv run' || '' }} ruff check .
-          ${{ inputs.use_uv && 'uv run' || '' }} ruff format --check .
+          uv run --locked ruff check .
+          uv run --locked ruff format --check .
 
   test:
     name: Test
@@ -69,7 +63,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up uv
-        if: inputs.use_uv
         uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           # Pinned, so the tool that enforces the callers' exclude-newer cooldown
@@ -78,33 +71,23 @@ jobs:
           version: "0.13.7"
           python-version: ${{ inputs.python_version }}
 
-      # With a uv.lock, fail on a lock that no longer matches pyproject.toml
-      # instead of quietly re-locking (uv sync / uv run read UV_LOCKED).
-      - name: Require an up-to-date uv.lock
-        if: inputs.use_uv
-        run: if [ -f uv.lock ]; then echo "UV_LOCKED=1" >> "$GITHUB_ENV"; fi
+      - name: Install dependencies
+        run: uv sync --locked
 
-      - name: Set up Python
-        if: '!inputs.use_uv'
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
-        with:
-          python-version: ${{ inputs.python_version }}
-          cache: pip
-
-      - name: Install dependencies (pip)
-        if: '!inputs.use_uv'
+      # Known vulnerabilities in what the image ships: the locked runtime
+      # dependencies, without the dev group. --no-deps and --disable-pip
+      # audit exactly the pinned list instead of resolving it again. Fails
+      # the job on a finding: Renovate's CVE pull requests fix them.
+      - name: Audit dependencies
+        env:
+          PIP_AUDIT_VERSION: ${{ inputs.pip_audit_version }}
         run: |
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          if [ -f pyproject.toml ]; then pip install -e ".[dev]" 2>/dev/null || pip install -e .; fi
-
-      - name: Install dependencies (uv)
-        if: inputs.use_uv
-        run: uv sync
+          set -o pipefail
+          uv export --frozen --no-dev --format requirements-txt |
+            uvx "pip-audit==${PIP_AUDIT_VERSION}" -r /dev/stdin --no-deps --disable-pip
 
       - name: Run tests
-        run: |
-          ${{ inputs.use_uv && 'uv run' || '' }} pytest --cov --cov-report=xml --cov-report=term-missing
+        run: uv run --locked pytest --cov --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         if: inputs.enable_codecov
