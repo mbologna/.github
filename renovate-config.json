@@ -1,7 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Merging: platformAutomerge, so the forge (GitHub auto-merge, GitLab merge when pipeline succeeds) merges an automerge PR the moment its required checks pass, any day, instead of waiting for Renovate's next visit. That is only safe where the branch rules require the real CI checks: every public GitHub repository's ruleset requires its CI jobs and the PR title check, and every GitLab project requires a green pipeline. A repository without that (a private one on GitHub Free, which gets no rulesets) or one with a merge window (platformAutomerge ignores automergeSchedule: the forge merges whenever the checks pass) sets platformAutomerge false.",
+    "rebaseWhen conflicted: auto rebased every automerge PR that fell behind the default branch, and each rebase cost a CI run. The rulesets do not require a branch to be up to date and the merges are squash or merge commits, so a branch behind main still merges.",
+    "prHourlyLimit 0 with prConcurrentLimit and branchConcurrentLimit 20: Renovate's default of 2 PRs an hour parked updates under Rate-Limited, or pushed them as PR-less branches, while the queue was half empty; the concurrent limits already bound open PRs."
+  ],
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "customManagers:dockerfileVersions"
   ],
   "configMigration": true,
   "prCreation": "immediate",
@@ -17,14 +23,17 @@
   ],
   "commitMessageAction": "update",
   "commitMessagePrefix": "chore(deps):",
-  "rebaseWhen": "auto",
+  "rebaseWhen": "conflicted",
   "gitIgnoredAuthors": [
     "41898282+github-actions[bot]@users.noreply.github.com"
   ],
-  "platformAutomerge": false,
+  "platformAutomerge": true,
   "automergeStrategy": "squash",
   "separateMultipleMajor": false,
   "internalChecksAsSuccess": false,
+  "prHourlyLimit": 0,
+  "prConcurrentLimit": 20,
+  "branchConcurrentLimit": 20,
   "prBodyNotes": [
     "{{#if isVulnerabilityAlert}}\ud83d\udd12 **Security fix**: it skips the age gate and the merge window.{{/if}}"
   ],
@@ -37,8 +46,8 @@
     "dependencies"
   ],
   "vulnerabilityAlerts": {
-    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): fix(security): prefix, no age gate, no schedule. Renovate applies this block as force: it is spread over the result of every later merge, so whatever it sets replaces, never adds. It therefore sets nothing about merging or labelling: automerge here would also merge a major version, and labels, addLabels or prBodyNotes here would wipe the automerge/manual-review label, the major and build-check labels and the manual rules' note. The security label and note come from the top-level addLabels and prBodyNotes templates instead, which are appended. 1-minute floor (not 0 days) ensures Renovate posts a stability check: 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses, which blocks automerge on repos without CI. timestamp-optional because CVE fix packages may lack a releaseTimestamp. commitMessageSuffix is emptied: Renovate's default [SECURITY] only repeated the fix(security): prefix and the security label.",
-    "commitMessagePrefix": "fix(security):",
+    "description": "CVE-triggered PRs (OSV/GitHub Advisory on a version you use): no age gate, no schedule. The prefix is fix(security): for anything that ships and chore(security): for a development-only dependency (npm devDependencies, composer require-dev, PEP 735 dependency-groups, uv and PDM dev-dependencies, Poetry dev-dependencies and its dev group): auto-release releases at once only on fix(security):, and a dev-only fix changes no image or package, so it waits for the next regular release. A template, not a package rule: this block is force, so a rule could never change what it sets. Renovate applies this block as force: it is spread over the result of every later merge, so whatever it sets replaces, never adds. It therefore sets nothing about merging or labelling: automerge here would also merge a major version, and labels, addLabels or prBodyNotes here would wipe the automerge/manual-review label, the major label and the manual rules' note. The security label and note come from the top-level addLabels and prBodyNotes templates instead, which are appended. 1-minute floor (not 0 days) ensures Renovate posts a stability check: 0 days normalises to null internally, no check is posted, and GitHub returns state: pending with empty statuses, which blocks automerge on repos without CI. timestamp-optional because CVE fix packages may lack a releaseTimestamp. commitMessageSuffix is emptied: Renovate's default [SECURITY] only repeated the fix(security): prefix and the security label.",
+    "commitMessagePrefix": "{{#if (includes (toArray 'devDependencies' 'require-dev' 'dependency-groups' 'tool.uv.dev-dependencies' 'tool.pdm.dev-dependencies' 'dev-dependencies' 'dev') depType)}}chore(security):{{else}}fix(security):{{/if}}",
     "minimumReleaseAge": "1 minute",
     "minimumReleaseAgeBehaviour": "timestamp-optional",
     "schedule": [
@@ -55,6 +64,7 @@
     ]
   },
   "pre-commit": {
+    "enabled": true,
     "pinDigests": false
   },
   "terraform": {
@@ -85,6 +95,14 @@
       "format": "json",
       "transformTemplates": [
         "{\"releases\": [results.({\"version\": name, \"releaseTimestamp\": $substring(last_updated, 0, 19) & \"Z\", \"digest\": $type(digest) = 'string' ? digest})]}"
+      ]
+    },
+    "lscr-linuxserver": {
+      "description": "linuxserver.io images (lscr.io/linuxserver/<image>), from their GitHub releases (linuxserver/docker-<image>): one release per published -lsN image tag, with its date; develop and nightly builds are prereleases and are dropped. Every build gets the earliest date among the builds of its upstream version (the tag minus -lsN; a build suffix such as _v<library> stays in the key, so a library change waits its own gate): a new upstream version waits out the full age gate from its first build, later rebuilds of an aged version pass at once. sourceUrl points Renovate at the same repository, so the PR body carries each build's release notes. The newest 100 releases reach back months; one page of Docker Hub tags covered about 9 days for a busy image, so its 14 and 30-day gates could never pass and first builds were dated weeks late. packageName is the bare image name; a repository adds the regex manager that finds its pins and the versioning its tags need.",
+      "defaultRegistryUrlTemplate": "https://api.github.com/repos/linuxserver/docker-{{packageName}}/releases?per_page=100",
+      "format": "json",
+      "transformTemplates": [
+        "($r := $[prerelease = false].{\"name\": tag_name, \"ts\": $toMillis(published_at), \"up\": $replace(tag_name, /-ls[0-9]+$/, \"\")}; {\"sourceUrl\": \"https://github.com/linuxserver/docker-{{packageName}}\", \"releases\": [$r.($u := up; {\"version\": name, \"releaseTimestamp\": $fromMillis($min($r[up = $u].ts))})]})"
       ]
     }
   },
@@ -149,6 +167,43 @@
       "datasourceTemplate": "github-tags",
       "versioningTemplate": "npm",
       "extractVersionTemplate": "^php-(?<version>\\d+\\.\\d+\\.\\d+)$"
+    },
+    {
+      "description": "pip-audit version the reusable python-ci workflow runs with uvx (pip_audit_version: input in callers, default: under the pip_audit_version input here), from PyPI. No built-in manager reads a workflow input.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/workflows/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "pip_audit_version:\\s*['\"]?(?<currentValue>\\d+\\.\\d+\\.\\d+)['\"]?",
+        "pip_audit_version:\\n(?:[ \\t]+.*\\n){0,6}?[ \\t]+default:\\s*['\"]?(?<currentValue>\\d+\\.\\d+\\.\\d+)['\"]?"
+      ],
+      "depNameTemplate": "pip-audit",
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "description": "OpenTofu version files (.opentofu-version, read by tenv from the nearest parent directory). The depName joins the opentofu group, so the local version and the CI pins move in one PR and cannot drift apart.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.opentofu-version$/"
+      ],
+      "matchStrings": [
+        "^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"
+      ],
+      "depNameTemplate": "opentofu/opentofu",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "description": "GitHub release assets a kustomization pulls as remote resources (https://github.com/<owner>/<repo>/releases/download/<tag>/<file>, such as system-upgrade-controller's crd.yaml and manifest). depName is the owner/repo in the URL, so every URL of one release moves in the same PR. The kustomize manager reads images and Helm charts only.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)kustomization\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+)/releases/download/(?<currentValue>[^/\\s]+)/"
+      ],
+      "datasourceTemplate": "github-releases"
     }
   ],
   "packageRules": [
@@ -506,7 +561,7 @@
       ]
     },
     {
-      "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type. A lock-file-only update of an indirect dependency (a security fix in a pip-compile lock) has no currentValue or newValue, so it is titled with newVersion alone (dotfiles !21 read \"update pip/certifi from to\").",
+      "description": "pip_requirements/pip-compile: pip/ prefix, use constraint strings (deps may be unpinned), include update type. A lock-file-only update of an indirect dependency (a security fix in a pip-compile lock) has no currentValue or newValue, so it is titled with newVersion alone (the title used to read \"update pip/certifi from to\").",
       "matchManagers": [
         "pip_requirements",
         "pip-compile"
@@ -520,6 +575,16 @@
       ],
       "commitMessageTopic": "pip/{{depName}}",
       "commitMessageExtra": "{{#if currentValue}}from {{currentValue}} to {{newValue}}{{else}}to {{newVersion}}{{/if}} ({{updateType}})"
+    },
+    {
+      "description": "pip-compile lock refresh: the preset's lock file wording (maintain lock files). Renovate's pip-compile manager defaults the action to 'Refresh pip-compile outputs', whose capital fails a commitlint subject-case check. A package rule, because the manager's own default applies after the top-level lockFileMaintenance block.",
+      "matchManagers": [
+        "pip-compile"
+      ],
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "commitMessageAction": "maintain"
     },
     {
       "description": "pep621/poetry (pyproject.toml; pep621 also updates uv.lock, uv is not a Renovate manager): pip/ prefix, use resolved versions, include update type",
@@ -818,12 +883,43 @@
       "extractVersion": "^v(?<version>.+)$"
     },
     {
+      "description": "jq tags its GitHub releases jq-X.Y.Z. The date-less registries rule above sends a ghcr.io/jqlang/jq X.Y.Z pin to github-releases with extractVersion ^v?, so no release parsed ('Found no results from datasource that look like a version') and the pin went untracked. Matched by depName because the datasource has already changed.",
+      "matchDepNames": [
+        "ghcr.io/jqlang/jq"
+      ],
+      "extractVersion": "^jq-(?<version>.+)$"
+    },
+    {
+      "description": "The GitLab Runner image comes from registry.gitlab.com, which serves no release dates, so the age gate would hold every update; GitLab's own releases of gitlab-org/gitlab-runner carry the same vX.Y.Z versions, dated. Not Docker Hub's gitlab/gitlab-runner, which has over 15,000 tags.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchDepNames": [
+        "registry.gitlab.com/gitlab-org/gitlab-runner"
+      ],
+      "overrideDatasource": "gitlab-releases",
+      "overridePackageName": "gitlab-org/gitlab-runner"
+    },
+    {
       "description": "Floating tags on custom.dockerhub-suffix (3.12-alpine, 1.29-alpine, 28-dind, and bare ones such as docker 28 or python 3.12): Docker Hub's date for them is the latest rebuild, and official images rebuild every week or two, so the 14-day minor and 30-day major gates could never pass (python 3.15, docker 29-dind, nginx-unprivileged 1.31, 2026-10-13). A short gate still bounds the real age: a tag 3 days past its latest rebuild is at least 3 days old. Fixed tags (1.31.6-alpine) keep the normal gates. Bare floating tags were left out until 2026-10-23, so docker:28 never got its 29 update: 29 is rebuilt more often than every 30 days, and 28, end-of-life and off the newest-100 page, could not even get a digest pin. Must stay after the dockerhub-suffix override rules, which change the datasource it matches.",
       "matchDatasources": [
         "custom.dockerhub-suffix"
       ],
       "matchCurrentValue": "/^v?\\d+(\\.\\d+)?(-|$)/",
       "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Docker versioning for node images (node:<version>-<variant>), overriding config:recommended's workarounds:nodeDockerVersioning, which sets node versioning with a versionCompatibility that strips the variant (-trixie, -alpine) off the releases. The custom.dockerhub-suffix datasource above keys each digest by the full tag, so a digest update for 24.22.1-trixie found no release and failed with 'Could not determine new digest'. Docker versioning keeps the variant as the compatibility suffix. It also treats every Node major as stable, odd ones included; a major is a manual-review update anyway.",
+      "matchDatasources": [
+        "docker",
+        "custom.dockerhub-suffix"
+      ],
+      "matchDepNames": [
+        "node",
+        "docker.io/library/node"
+      ],
+      "versioning": "docker",
+      "versionCompatibility": null
     },
     {
       "description": "Any image published under mbologna/ (any registry, any depth, including future ones): an own build, not an external release, so no stability wait (1 minute, not 0 days: 0 days normalises to null, no stability status is posted and automerge blocks forever). timestamp-optional because registry.gitlab.com and ghcr.io have no tag timestamps, so the gate could never be met (2026-10-12).",
@@ -841,6 +937,21 @@
       "extractVersion": "^kustomize/v(?<version>.+)$"
     },
     {
+      "description": "Non-major PyPI and npm updates: one PR a week per repository, opened on Monday or Tuesday. Each was its own PR and its own CI run (on GitLab, on the self-hosted runner, two jobs at a time). Placed before the preset's other groups, so the uv, python, dev tooling and Docker base images groups still win for their members. Majors keep their own PR; security fixes are separate branches and never grouped.",
+      "matchDatasources": [
+        "pypi",
+        "npm"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "non-major dependencies",
+      "schedule": [
+        "* * * * 1,2"
+      ]
+    },
+    {
       "description": "One PR for every OpenTofu pin: CI install steps and .opentofu-version files",
       "matchDepNames": [
         "opentofu/opentofu"
@@ -848,28 +959,7 @@
       "groupName": "opentofu"
     },
     {
-      "description": "Language runtime images (python, php, ruby): a minor bump is a new language version (3.14 to 3.15) that removes deprecated APIs. It automerges like any minor, because the language group below moves CI's version (the reusable workflows' python_version/php_version inputs, setup-python, the GitLab test image) in the same PR, so green CI means the new version passed the tests. build-check asks GitLab CI to build the image in the merge request (GitHub PRs always build it), since a runtime bump is what breaks a Dockerfile.",
-      "matchDatasources": [
-        "docker",
-        "custom.dockerhub-suffix"
-      ],
-      "matchDepNames": [
-        "python",
-        "docker.io/library/python",
-        "php",
-        "docker.io/library/php",
-        "ruby",
-        "docker.io/library/ruby"
-      ],
-      "matchUpdateTypes": [
-        "minor"
-      ],
-      "addLabels": [
-        "build-check"
-      ]
-    },
-    {
-      "description": "Python in one PR per repository: the Dockerfile's base image, the GitLab CI test image, the reusable workflows' python_version input and setup-python's python-version. They are the same language version, and separate PRs left CI testing 3.14 while the images ran 3.15 (5 repositories, 2026-11). Digest updates stay in the Docker base images group.",
+      "description": "Python in one PR per repository: the Dockerfile's base image, the GitLab CI test image, the reusable workflows' python_version input and setup-python's python-version. They are the same language version, and separate PRs left CI testing 3.14 while the images ran 3.15 (5 repositories, 2026-11). Digest updates stay in the Docker base images group. A minor (3.15 to 3.16) is a new language version that removes deprecated APIs; it automerges like any minor because CI's version moves in the same PR, so green CI means the new version passed the tests.",
       "matchDepNames": [
         "python",
         "docker.io/library/python"
@@ -895,20 +985,6 @@
       "groupName": "php"
     },
     {
-      "description": "Base-image majors (a new Debian or Alpine generation, nginx 2): build-check asks GitLab CI to build the image in the merge request; GitHub PRs always build it.",
-      "matchManagers": [
-        "dockerfile",
-        "docker-compose",
-        "gitlabci"
-      ],
-      "matchUpdateTypes": [
-        "major"
-      ],
-      "addLabels": [
-        "build-check"
-      ]
-    },
-    {
       "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo). Patches and minors automerge after their age gate: the caller's hugo-pr-build workflow builds the site with the new version, deploys a preview and checks it before merge, which catches what a release could break (a minor's template or default changes included). MUST come after the regex and github-actions rules above so its title wins.",
       "matchPackageNames": [
         "gohugoio/hugo"
@@ -918,14 +994,17 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "uv: one PR per uv release for every place a repository pins it: uv from PyPI in requirements-uv.txt (hash-pinned, installed with pip in a Dockerfile's build stage), the uv image where a Dockerfile still copies it (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. Dockerfiles take uv from PyPI because PyPI gives the release date the digest-pinned ghcr.io image lacks: that image's updates could not be age-gated and waited for a person in every repository (the date-less digest-pinned rule), while the PyPI uv waits out the usual age gate and automerges; the pip_requirements manager refreshes the hashes. After the ghcr.io override rules, which must not lose the image's lookup.",
+      "description": "uv: one PR per uv release for every place a repository pins it: uv from PyPI in requirements-uv.txt (hash-pinned, installed with pip in a Dockerfile's build stage), the uv image where a Dockerfile still copies it (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. One PR a week, opened on Monday or Tuesday: the PyPI members would get that schedule from the non-major dependencies group anyway, and the setup-uv input from the github-actions group, so the whole group shares it. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. Dockerfiles take uv from PyPI because PyPI gives the release date the digest-pinned ghcr.io image lacks: that image's updates could not be age-gated and waited for a person in every repository (the date-less digest-pinned rule), while the PyPI uv waits out the usual age gate and automerges; the pip_requirements manager refreshes the hashes. After the ghcr.io override rules, which must not lose the image's lookup.",
       "matchDepNames": [
         "uv",
         "ghcr.io/astral-sh/uv",
         "astral-sh/uv",
         "uv_build"
       ],
-      "groupName": "uv"
+      "groupName": "uv",
+      "schedule": [
+        "* * * * 1,2"
+      ]
     },
     {
       "description": "Third-party base-image digests (Dockerfile, compose and GitLab CI job image rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy compares the old and new base images with Trivy and releases at once when fixable HIGH/CRITICAL CVEs are gone, so holding it would delay CVE fixes by up to a week. A merge builds nothing by itself: images are built when a release ships. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds.",
@@ -990,7 +1069,7 @@
       ]
     },
     {
-      "description": "Helm chart patch and minor updates: one PR a week per repository, opened on Monday or Tuesday, instead of a chain of PRs as a chart moves 10.9.7, 10.10.3, 10.10.5 in a week. A repository whose image scanner expedites single chart PRs (infra) sets groupName null for helm and keeps the weekly schedule.",
+      "description": "Helm chart patch and minor updates: one PR a week per repository, opened on Monday or Tuesday, instead of a chain of PRs as a chart moves 10.9.7, 10.10.3, 10.10.5 in a week. A repository whose image scanner expedites single chart PRs sets groupName null for helm and keeps the weekly schedule.",
       "matchDatasources": [
         "helm"
       ],
@@ -1004,11 +1083,12 @@
       ]
     },
     {
-      "description": "Lock file maintenance automerges, in the night window, where the package manager holds the refresh to releases at least 7 days old: npm (install --before), Poetry (POETRY_SOLVER_MIN_RELEASE_AGE) and uv.lock under pep621, whose consumers all set [tool.uv] exclude-newer = \"7 days\" (a repository without it must add it before relying on this rule). Composer, cargo, bundler and the rest take whatever is newest, so they keep the top-level manual review.",
+      "description": "Lock file maintenance automerges where the package manager holds the refresh to releases at least 7 days old: npm (install --before), Poetry (POETRY_SOLVER_MIN_RELEASE_AGE), uv.lock under pep621, whose consumers all set [tool.uv] exclude-newer = \"7 days\", and pip-compile, whose lock Renovate regenerates with the command in its header, so a repository that enables the pip-compile manager compiles with uv pip compile --exclude-newer P7D. A repository whose lock lacks that setting must add it before relying on this rule. Composer, cargo, bundler and the rest take whatever is newest, so they keep the manual review at the end.",
       "matchManagers": [
         "npm",
         "poetry",
-        "pep621"
+        "pep621",
+        "pip-compile"
       ],
       "matchUpdateTypes": [
         "lockFileMaintenance"
@@ -1132,6 +1212,23 @@
       ],
       "prBodyNotes": [
         "**Why this waits for you:** this package manager cannot hold a lock refresh to releases at least 7 days old, so it may bring in a release published today."
+      ]
+    },
+    {
+      "description": "Dependencies pinned to a branch's commit (the git-refs datasource: a '# renovate:' comment names the branch, and the new HEAD comes as a digest update). A commit has no release date, so no age gate can hold it, and it would automerge as soon as CI passed. A person reviews each one. A repository can group them and give them a weekly schedule.",
+      "matchDatasources": [
+        "git-refs"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "mbologna"
+      ],
+      "labels": [
+        "dependencies",
+        "manual-review"
+      ],
+      "prBodyNotes": [
+        "**Why this waits for you:** a new commit on a branch the repository follows. It has no release, no release date and no age gate; read the upstream commits before merging."
       ]
     }
   ]
