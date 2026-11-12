@@ -78,12 +78,16 @@ jobs:
       # dependencies, without the dev group. --no-deps and --disable-pip
       # audit exactly the pinned list instead of resolving it again. Fails
       # the job on a finding: Renovate's CVE pull requests fix them.
+      # --no-hashes: once one line has a hash pip-audit wants all of them
+      # hashed, and uv writes none for the project itself or a git
+      # dependency (pip-audit lists those as skipped). The audit matches on
+      # name and version, so the hashes add nothing to it.
       - name: Audit dependencies
         env:
           PIP_AUDIT_VERSION: ${{ inputs.pip_audit_version }}
         run: |
           set -o pipefail
-          uv export --frozen --no-dev --format requirements-txt |
+          uv export --frozen --no-dev --no-emit-project --no-hashes --format requirements-txt |
             uvx "pip-audit==${PIP_AUDIT_VERSION}" -r /dev/stdin --no-deps --disable-pip
 
       - name: Run tests

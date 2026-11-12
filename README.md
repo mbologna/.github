@@ -132,7 +132,7 @@ Secrets: `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`.
 
 `Lint` (`ruff check`, `ruff format --check`) and `Test` (pytest, then
 pip-audit on the locked runtime dependencies:
-`uv export --frozen --no-dev --format requirements-txt | uvx pip-audit==<pin> -r /dev/stdin --no-deps --disable-pip`).
+`uv export --frozen --no-dev --no-emit-project --no-hashes --format requirements-txt | uvx pip-audit==<pin> -r /dev/stdin --no-deps --disable-pip`).
 uv only, with `uv sync --locked`, so a stale `uv.lock` fails. Inputs:
 `python_version` (default `3.15`; callers set the Python their Dockerfile
 ships), `enable_codecov` (default `true`), `pip_audit_version` (tracked by
