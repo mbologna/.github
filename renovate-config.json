@@ -204,6 +204,21 @@
         "https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+)/releases/download/(?<currentValue>[^/\\s]+)/"
       ],
       "datasourceTemplate": "github-releases"
+    },
+    {
+      "description": "Node.js version passed to the reusable node-ci workflow (node_version: input in callers), looked up like setup-node's own node-version input (actions/node-versions releases). npm versioning keeps a one-part value one-part (24 to 26). A new Node major is a major update, so it waits for a person; lts/* is not matched and keeps floating.",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.github/workflows/[^/]+\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "node_version:\\s*['\"]?(?<currentValue>\\d+(?:\\.\\d+){0,2})['\"]?"
+      ],
+      "depNameTemplate": "node",
+      "packageNameTemplate": "actions/node-versions",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "npm",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)(-\\d+)?$"
     }
   ],
   "packageRules": [
