@@ -61,7 +61,9 @@ on:
 
 jobs:
   ci:
-    name: Node.js ${{ matrix.node-version }}
+    # A single version runs as "Test", so the required check keeps its name
+    # when node_version moves; a node_versions matrix needs one name per version.
+    name: ${{ inputs.node_versions != '' && format('Node.js {0}', matrix.node-version) || 'Test' }}
     runs-on: ubuntu-26.04
     permissions:
       contents: read
