@@ -108,7 +108,7 @@
   },
   "customManagers": [
     {
-      "description": "Hugo version passed to the reusable Hugo workflows (hugo_version: input in callers, default: under the hugo_version input here). The hugo-version: input of peaceiris/actions-hugo is already handled by the built-in github-actions manager with the same depName, so every Hugo pin lands in one PR.",
+      "description": "Hugo version in workflow files (a hugo_version: value, or the default: under a hugo_version input of a reusable workflow or composite action). The hugo-version: input of peaceiris/actions-hugo is already handled by the built-in github-actions manager with the same depName, so every Hugo pin lands in one PR.",
       "customType": "regex",
       "managerFilePatterns": [
         "/(^|/)\\.github/workflows/[^/]+\\.ya?ml$/"
