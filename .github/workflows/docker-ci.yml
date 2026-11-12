@@ -37,16 +37,6 @@ on:
         required: false
         type: boolean
         default: true
-      platforms:
-        description: Comma-separated list of target platforms (informational; native runners are used per-platform)
-        required: false
-        type: string
-        default: linux/amd64,linux/arm64
-      enable_grype:
-        description: Run Grype vulnerability scanner in addition to Trivy
-        required: false
-        type: boolean
-        default: false
       enable_cosign:
         description: Sign images with Cosign (keyless / OIDC)
         required: false
@@ -97,6 +87,62 @@ on:
           .pre-commit-config.yaml
           .gitignore
           LICENSE
+      release_strategy:
+        description: >-
+          Runs auto-release.yml after the build when set: its strategy for
+          Monday's schedule, normally 'conventional'. Empty (the default) runs
+          no release. A push to the default branch releases only a CVE fix and
+          a manual run releases whatever is unreleased; pull requests, other
+          branches and tag builds skip it (the gate is in auto-release.yml).
+          The calling job must grant contents: write (the tag and the Release)
+          and actions: write (to dispatch the tag build), and the caller must
+          list workflow_dispatch in its on:.
+        required: false
+        type: string
+        default: ""
+      release_image:
+        description: >-
+          Image without a tag that auto-release logs in to; empty means
+          ghcr.io/<owner>/<image_name>
+        required: false
+        type: string
+        default: ""
+      dockerfiles:
+        description: >-
+          Dockerfiles whose base images auto-release's security strategy
+          compares, separated by spaces or commas; empty means the dockerfile
+          input
+        required: false
+        type: string
+        default: ""
+      dispatch_workflow:
+        description: >-
+          Workflow file auto-release starts on the new tag; empty means the
+          calling workflow
+        required: false
+        type: string
+        default: ""
+      deploy_type:
+        description: >-
+          Deploys the image to Cloud Run with gcp-deploy.yml when set: 'service'
+          or 'job'. Only a push or a manual run on the default branch that
+          pushed an image deploys; a build that skip_paths skipped, a pull
+          request or a tag build doesn't. Needs publish: push (the deploy runs
+          the sha-* image), the GCP_WORKLOAD_IDENTITY_PROVIDER and
+          GCP_SERVICE_ACCOUNT secrets (secrets: inherit) and id-token: write.
+        required: false
+        type: string
+        default: ""
+      deploy_name:
+        description: Cloud Run service or job name; empty means image_name
+        required: false
+        type: string
+        default: ""
+      region:
+        description: Cloud Run region
+        required: false
+        type: string
+        default: us-central1
       yamllint_paths:
         description: Space-separated paths for yamllint to scan
         required: false
@@ -122,10 +168,10 @@ jobs:
       build: ${{ steps.plan.outputs.build }}
       push: ${{ steps.plan.outputs.push }}
     steps:
-      # Every later job keys off these two outputs, so nothing that expects a
-      # pushed digest (merge, scans, signing, tests, cleanup, release) runs
-      # when nothing was pushed. A schedule event carries no repository
-      # payload, but always runs on the default branch.
+      # Every later job keys off the build and push outputs, so nothing that
+      # expects a pushed digest (merge, scans, signing, tests, cleanup,
+      # deploy) runs when nothing was pushed. A schedule event carries no
+      # repository payload, but always runs on the default branch.
       - name: Decide what to build and push
         id: plan
         env:
@@ -133,6 +179,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           DEFAULT_REF: refs/heads/${{ github.event.repository.default_branch }}
           SKIP_PATHS: ${{ inputs.skip_paths }}
+          DOCKERFILE: ${{ inputs.dockerfile }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_TOKEN: ${{ github.token }}
@@ -150,39 +197,63 @@ jobs:
           elif [[ $GITHUB_REF == refs/tags/* || $GITHUB_REF == "$DEFAULT_REF" || $EVENT == schedule ]]; then
             push=true
           fi
-          # Only image inputs justify a build: skip it when every changed file
-          # matches skip_paths. Anything uncertain builds.
-          if [ "$build" = true ] && { [ "$EVENT" = pull_request ] || { [ "$EVENT" = push ] && [[ $GITHUB_REF == refs/heads/* ]]; }; } \
-            && [ -n "$SKIP_PATHS" ] && [ -n "$BASE" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ]; then
+          # The changed files of a pull request or branch push. Tags,
+          # schedules and manual runs have none, and anything the compare API
+          # can't answer (a new branch, a force-push, over 300 files) counts as
+          # unknown: both checks below then do their work.
+          files=""
+          known=false
+          if { [ "$EVENT" = pull_request ] || { [ "$EVENT" = push ] && [[ $GITHUB_REF == refs/heads/* ]]; }; } \
+            && [ -n "$BASE" ] && [ "$BASE" != 0000000000000000000000000000000000000000 ]; then
             if files=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE}...${HEAD}" \
-                --jq 'if (.files | length) >= 300 then error("too many files") else .files[].filename end' 2>/dev/null); then
-              image_change=false
-              while IFS= read -r f; do
-                [ -n "$f" ] || continue
-                matched=false
-                while IFS= read -r pat; do
-                  [ -n "$pat" ] || continue
-                  # shellcheck disable=SC2053 # $pat is a pattern on purpose
-                  if [[ $f == $pat ]]; then matched=true; break; fi
-                done <<< "$SKIP_PATHS"
-                if [ "$matched" = false ]; then image_change=true; echo "image input changed: ${f}"; break; fi
-              done <<< "$files"
-              if [ "$image_change" = false ] && [ -n "$files" ]; then
-                echo "only files in skip_paths changed: no build"
-                build=false
-                push=false
-              fi
+                --jq 'if (.files | length) >= 300 then error("too many files") else .files[].filename end' 2>/dev/null) \
+                && [ -n "$files" ]; then
+              known=true
             else
-              echo "could not list the changed files: building"
+              echo "could not list the changed files: building and linting"
             fi
           fi
-          echo "publish=${PUBLISH} event=${EVENT} ref=${GITHUB_REF}: build=${build} push=${push}"
-          echo "build=${build}" >> "$GITHUB_OUTPUT"
-          echo "push=${push}" >> "$GITHUB_OUTPUT"
+          # Only image inputs justify a build: skip it when every changed file
+          # matches skip_paths.
+          if [ "$build" = true ] && [ "$known" = true ] && [ -n "$SKIP_PATHS" ]; then
+            image_change=false
+            while IFS= read -r f; do
+              [ -n "$f" ] || continue
+              matched=false
+              while IFS= read -r pat; do
+                [ -n "$pat" ] || continue
+                # shellcheck disable=SC2053 # $pat is a pattern on purpose
+                if [[ $f == $pat ]]; then matched=true; break; fi
+              done <<< "$SKIP_PATHS"
+              if [ "$matched" = false ]; then image_change=true; echo "image input changed: ${f}"; break; fi
+            done <<< "$files"
+            if [ "$image_change" = false ]; then
+              echo "only files in skip_paths changed: no build"
+              build=false
+              push=false
+            fi
+          fi
+          # hadolint only when the Dockerfile (or its config) changed.
+          hadolint=true
+          if [ "$known" = true ]; then
+            hadolint=false
+            while IFS= read -r f; do
+              case "$f" in
+                "${DOCKERFILE#./}" | .hadolint.yaml | .hadolint.yml) hadolint=true ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "publish=${PUBLISH} event=${EVENT} ref=${GITHUB_REF}: build=${build} push=${push} hadolint=${hadolint}"
+          {
+            echo "build=${build}"
+            echo "push=${push}"
+            echo "hadolint=${hadolint}"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Hadolint
+        if: steps.plan.outputs.hadolint == 'true'
         uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: ${{ inputs.dockerfile }}
@@ -475,9 +546,12 @@ jobs:
           image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
           format: sarif
           output: trivy-results.sarif
+          # The filter of the whole pipeline (auto-release's base-image check,
+          # GitLab's release scan): fixable HIGH and CRITICAL findings only.
+          # A report, not a gate: no exit-code.
           ignore-unfixed: true
           vuln-type: os,library
-          severity: CRITICAL,HIGH,MEDIUM
+          severity: CRITICAL,HIGH
           timeout: 10m
 
       - name: Upload Trivy SARIF
@@ -486,32 +560,6 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
           category: trivy
-
-  scan-grype:
-    name: Security Scan (grype)
-    runs-on: ubuntu-26.04
-    needs: merge
-    if: inputs.enable_grype && needs.merge.result == 'success'
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - name: Install Grype
-        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
-
-      - name: Run Grype
-        continue-on-error: true
-        run: |
-          grype db update
-          grype "ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}" \
-            --output sarif > grype-results.sarif
-
-      - name: Upload Grype SARIF
-        if: always() && hashFiles('grype-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
-        with:
-          sarif_file: grype-results.sarif
-          category: grype
 
   sign:
     name: Sign Images
@@ -608,7 +656,7 @@ jobs:
   cleanup:
     name: Cleanup old package versions
     runs-on: ubuntu-26.04
-    needs: [scan-trivy, scan-grype, sign, integration-test]
+    needs: [scan-trivy, sign, integration-test]
     if: |
       always() &&
       needs.scan-trivy.result == 'success'
@@ -642,3 +690,41 @@ jobs:
           # it (2026-10-22).
           exclude-tags: '^(latest|main|master)$|^v?[0-9][0-9.]*$|^v?[0-9][0-9.]*-[0-9A-Za-z.]+$'
           use-regex: true
+
+  # auto-release.yml carries its own gate (schedule, or a push or manual run
+  # on the default branch), so this job only needs a strategy. It follows the
+  # build job, which always runs and is a no-op when nothing was built: a push
+  # that publish: release or skip_paths left unbuilt still gets its CVE check.
+  # No permissions block, as in auto-release.yml: it takes the calling job's,
+  # so a caller without actions: write fails at the dispatch, not at startup.
+  # A ./ path in a reusable workflow resolves to this repository at the commit
+  # the caller pinned, not to the caller's repository.
+  auto-release:
+    needs: [lint, build]
+    if: inputs.release_strategy != ''
+    uses: ./.github/workflows/auto-release.yml
+    with:
+      strategy: ${{ inputs.release_strategy }}
+      image: ${{ inputs.release_image || format('ghcr.io/{0}/{1}', github.repository_owner, inputs.image_name) }}
+      dockerfiles: ${{ inputs.dockerfiles || inputs.dockerfile }}
+      dispatch_workflow: ${{ inputs.dispatch_workflow }}
+
+  # Runs this commit's sha-* image on Cloud Run, only when the merge job
+  # pushed one on the default branch: a docs- or CI-only push that skip_paths
+  # left unbuilt deploys nothing.
+  deploy:
+    needs: merge
+    if: >-
+      inputs.deploy_type != '' && needs.merge.outputs.digest != '' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    permissions:
+      id-token: write
+      contents: read
+    uses: ./.github/workflows/gcp-deploy.yml
+    with:
+      image_name: ${{ inputs.image_name }}
+      deploy_type: ${{ inputs.deploy_type }}
+      deploy_name: ${{ inputs.deploy_name || inputs.image_name }}
+      region: ${{ inputs.region }}
+    secrets: inherit
