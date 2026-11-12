@@ -50,7 +50,10 @@ on:
         type: string
         default: ""
       dry_run:
-        description: Only print the next version and its notes, in the job summary
+        description: >-
+          Only print the next version and its notes, in the job summary. A
+          manual run whose workflow_dispatch has a dry_run input that is true
+          is a dry run too.
         required: false
         type: boolean
         default: false
@@ -58,6 +61,16 @@ on:
 jobs:
   auto-release:
     name: Auto Release (${{ inputs.strategy }})
+    # Monday's schedule and a manual run release with the strategy below; a
+    # push to the default branch releases only a CVE fix (the security
+    # strategy). Pull requests, other branches and the tag build that
+    # auto-release dispatches (it runs on the tag ref) skip the job, so a
+    # caller needs no gate of its own. A schedule event carries no repository
+    # payload, but always runs on the default branch.
+    if: >-
+      github.event_name == 'schedule' ||
+      ((github.event_name == 'workflow_dispatch' || github.event_name == 'push') &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-26.04
     # No permissions block: the job takes what the caller's job grants, which
     # must be `contents: write` (push the tag, create the Release) and
@@ -82,7 +95,7 @@ jobs:
           AUTO_RELEASE_IMAGE: ${{ inputs.image }}
           AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
           AUTO_RELEASE_DISPATCH: ${{ inputs.dispatch_tag_build }}
-          AUTO_RELEASE_DRY_RUN: ${{ inputs.dry_run }}
+          AUTO_RELEASE_DRY_RUN: ${{ inputs.dry_run || github.event.inputs.dry_run == 'true' }}
           DOCKERFILES: ${{ inputs.dockerfiles }}
           # In a called workflow, github.workflow_ref is the caller's:
           # owner/repo/.github/workflows/ci.yml@refs/heads/main
