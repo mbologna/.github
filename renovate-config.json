@@ -77,13 +77,8 @@
       "enabled": false
     }
   },
-  "composer": {
-    "lockFileMaintenance": {
-      "enabled": false
-    }
-  },
   "lockFileMaintenance": {
-    "description": "Weekly refresh (Saturday or Sunday, like the weekly groups) of every lock file to the newest versions the ranges allow, transitive ones included. Renovate posts no stability check for it, but hands minimumReleaseAge to two package managers: npm install --before=<now minus 7 days> and Poetry's POETRY_SOLVER_MIN_RELEASE_AGE, so npm and Poetry lock files take only releases at least 7 days old. uv.lock honours [tool.uv] exclude-newer (the uv consumers set 7 days). Those automerge (the lock file rule below); every other lock file takes whatever is newest: composer's refresh is off (php-ci audits the lock instead), and cargo, bundler and the rest wait for a person (the manual lock file rule at the end, which also makes them monthly). timestamp-optional because the update has no release timestamp, so with the default the branch would stay pending.",
+    "description": "Weekly refresh (Saturday or Sunday, like the weekly groups) of every lock file to the newest versions the ranges allow, transitive ones included. Renovate posts no stability check for it, but hands minimumReleaseAge to two package managers: npm install --before=<now minus 7 days> and Poetry's POETRY_SOLVER_MIN_RELEASE_AGE, so npm and Poetry lock files take only releases at least 7 days old. uv.lock honours [tool.uv] exclude-newer (the uv consumers set 7 days). Those automerge (the lock file rule below); every other lock file takes whatever is newest: cargo, bundler and the rest wait for a person (the manual lock file rule at the end, which also makes them monthly). timestamp-optional because the update has no release timestamp, so with the default the branch would stay pending.",
     "enabled": true,
     "commitMessageAction": "maintain",
     "commitMessageTopic": "lock files",
@@ -156,22 +151,6 @@
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "npm",
       "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)(-\\d+)?$"
-    },
-    {
-      "description": "PHP version passed to the reusable php-ci workflow (php_version: input in callers, default: under the php_version input here), from php-src's php-X.Y.Z tags. Joins the php group with the Dockerfile's base image. npm versioning keeps a two-part value two-part (8.4 to 8.5).",
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/(^|/)\\.github/workflows/[^/]+\\.ya?ml$/"
-      ],
-      "matchStrings": [
-        "php_version:\\s*['\"]?(?<currentValue>\\d+\\.\\d+(?:\\.\\d+)?)['\"]?",
-        "php_version:\\n(?:[ \\t]+.*\\n){0,4}?[ \\t]+default:\\s*['\"]?(?<currentValue>\\d+\\.\\d+(?:\\.\\d+)?)['\"]?"
-      ],
-      "depNameTemplate": "php",
-      "packageNameTemplate": "php/php-src",
-      "datasourceTemplate": "github-tags",
-      "versioningTemplate": "npm",
-      "extractVersionTemplate": "^php-(?<version>\\d+\\.\\d+\\.\\d+)$"
     },
     {
       "description": "pip-audit version the reusable python-ci workflow runs with uvx (pip_audit_version: input in callers, default: under the pip_audit_version input here), from PyPI. No built-in manager reads a workflow input.",
@@ -463,21 +442,6 @@
         "engines"
       ],
       "enabled": false
-    },
-    {
-      "description": "composer: composer/ prefix, from/to resolved versions and update type",
-      "matchManagers": [
-        "composer"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor",
-        "patch",
-        "pin",
-        "digest"
-      ],
-      "commitMessageTopic": "composer/{{depName}}",
-      "commitMessageExtra": "from {{currentVersion}} to {{newVersion}} ({{updateType}})"
     },
     {
       "description": "github-actions: action/ prefix, strip org keeping only action name, include from/to versions and update type",
@@ -994,8 +958,7 @@
     {
       "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened on Saturday or Sunday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchManagers": [
-        "npm",
-        "composer"
+        "npm"
       ],
       "matchDepTypes": [
         "devDependencies",
@@ -1053,7 +1016,7 @@
       ]
     },
     {
-      "description": "One maintenance PR a week per repository: every patch, minor and digest update that has no group of its own below, opened on Saturday or Sunday so it merges before Monday's release run (auto-release turns runtime changes into a maintenance release). It replaces the weekly groups above (GitHub Actions, the mbologna/.github pin, non-major PyPI and npm, uv, OpenTofu, dev tooling, Terraform providers, pre-commit hooks, Helm charts), which were up to eight weekly PRs and pipelines per repository; members that must move together (uv's PyPI package, build backend and setup-uv input) still do, on one branch. Placed after them, so it wins. What stays out: the hugo, python and php groups and the Docker base images group, placed after this rule so they win (a repository adds its own pins to the hugo group; a language version or a base-image rebuild gets its own PR and its own green CI; a rebuild is not held for the weekend because its merge is what releases a CVE fix); majors, which keep one PR each (the major rules at the end set groupName null or leave them ungrouped); security fixes, whose vulnerabilityAlerts block is applied last with groupName null and no schedule; lock file maintenance, always its own branch. Never automerge and manual review in one branch: the name depends on the label, so an update that a rule sends to a person (the manual-review label, which every manual rule sets, in this preset and in the repositories) lands in a separate 'maintenance, manual review' PR, and the preset's own manual rules after this one take updates out of every group. A repository rule that turns automerge off must also set the manual-review label, or the whole maintenance PR waits for a person. updateNotScheduled false: the branch is only rebuilt on the schedule days, so an update released on a Tuesday doesn't restart the PR's CI until the weekend. Not infra, which merges one PR per app in its own window and keeps the narrower groups.",
+      "description": "One maintenance PR a week per repository: every patch, minor and digest update that has no group of its own below, opened on Saturday or Sunday so it merges before Monday's release run (auto-release turns runtime changes into a maintenance release). It replaces the weekly groups above (GitHub Actions, the mbologna/.github pin, non-major PyPI and npm, uv, OpenTofu, dev tooling, Terraform providers, pre-commit hooks, Helm charts), which were up to eight weekly PRs and pipelines per repository; members that must move together (uv's PyPI package, build backend and setup-uv input) still do, on one branch. Placed after them, so it wins. What stays out: the hugo and python groups and the Docker base images group, placed after this rule so they win (a repository adds its own pins to the hugo group; a language version or a base-image rebuild gets its own PR and its own green CI; a rebuild is not held for the weekend because its merge is what releases a CVE fix); majors, which keep one PR each (the major rules at the end set groupName null or leave them ungrouped); security fixes, whose vulnerabilityAlerts block is applied last with groupName null and no schedule; lock file maintenance, always its own branch. Never automerge and manual review in one branch: the name depends on the label, so an update that a rule sends to a person (the manual-review label, which every manual rule sets, in this preset and in the repositories) lands in a separate 'maintenance, manual review' PR, and the preset's own manual rules after this one take updates out of every group. A repository rule that turns automerge off must also set the manual-review label, or the whole maintenance PR waits for a person. updateNotScheduled false: the branch is only rebuilt on the schedule days, so an update released on a Tuesday doesn't restart the PR's CI until the weekend. Not infra, which merges one PR per app in its own window and keeps the narrower groups.",
       "matchRepositories": [
         "!mbologna/infra"
       ],
@@ -1092,20 +1055,7 @@
       "groupName": "python"
     },
     {
-      "description": "PHP in one PR per repository, for the same reason as the Python group: the Dockerfile's base image and the reusable php-ci workflow's php_version input. After the maintenance group, so it wins, like the python group.",
-      "matchDepNames": [
-        "php",
-        "docker.io/library/php"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor",
-        "patch"
-      ],
-      "groupName": "php"
-    },
-    {
-      "description": "Third-party base-image digests (Dockerfile, compose and GitLab CI job image rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy compares the old and new base images with Trivy and releases at once when fixable HIGH/CRITICAL CVEs are gone, so holding it would delay CVE fixes by up to a week. A merge builds nothing by itself: images are built when a release ships. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds. After the maintenance group, so it wins and keeps its unscheduled, per-wave PRs.",
+      "description": "Third-party base-image digests (Dockerfile, compose and GitLab CI job image rebuilds of python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy compares the old and new base images with Trivy and releases at once when fixable HIGH/CRITICAL CVEs are gone, so holding it would delay CVE fixes by up to a week. A merge builds nothing by itself: images are built when a release ships. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds. After the maintenance group, so it wins and keeps its unscheduled, per-wave PRs.",
       "matchManagers": [
         "dockerfile",
         "docker-compose",
@@ -1231,7 +1181,7 @@
       "groupName": null
     },
     {
-      "description": "Lock file maintenance for package managers that cannot hold a refresh to releases at least 7 days old (cargo, bundler, ...): a person merges it, once a month (days 1-3, so the GitHub app gets more than one chance to open it). composer is off altogether (the composer manager block): php-ci runs composer audit instead, so a vulnerable transitive package turns CI red rather than an ungated refresh merging. npm, Poetry, pep621 (uv.lock) and pip-compile locks are gated and automerge (the lock file rule above, and repository rules).",
+      "description": "Lock file maintenance for package managers that cannot hold a refresh to releases at least 7 days old (cargo, bundler, ...): a person merges it, once a month (days 1-3, so the GitHub app gets more than one chance to open it). npm, Poetry, pep621 (uv.lock) and pip-compile locks are gated and automerge (the lock file rule above, and repository rules).",
       "matchUpdateTypes": [
         "lockFileMaintenance"
       ],

@@ -83,7 +83,7 @@ more tool for whoever gets a shell in the container.
 | **Pinned bases.** `FROM image:tag@sha256:…`, from the official or upstream image; Renovate moves tag and digest. A language's build and runtime stages use the same digest. | The build is reproducible, auto-release's security strategy compares base images exactly, and compiled extensions match the runtime they run on. |
 | **Multi-stage.** Compilers, build headers, package managers, git and curl exist only in the build stage. The runtime stage holds the language runtime, the application, its locked dependencies, and the OS packages the application executes. No pip, uv, npm, npx, corepack, yarn or composer, no compiler, no VCS. | Nothing to fetch or build code with at run time, and no CVEs in tools that never run (pip's vendored packages, npm's bundled dependencies). |
 | **Locked dependencies, dev excluded.** Hash- or integrity-checked lock files: `uv sync --locked --no-dev`, `npm ci --omit=dev`, `composer install --no-dev --classmap-authoritative` from `composer.lock`, `go.sum`. | The image runs what CI tested. A changed or substituted artifact fails the build. |
-| **Smallest base that works.** Static binaries (Go, Rust) on `scratch` or `gcr.io/distroless/static`. Interpreted runtimes on the upstream `-alpine` variant, or `-slim` when a dependency needs glibc. | Distroless doesn't ship the Python, PHP and Node versions we run, so the upstream slim or alpine image is the smallest supported choice. |
+| **Smallest base that works.** Static binaries (Go, Rust) on `scratch` or `gcr.io/distroless/static`. Interpreted runtimes on the upstream `-alpine` variant, or `-slim` when a dependency needs glibc. | Distroless doesn't ship the Python and Node versions we run, so the upstream slim or alpine image is the smallest supported choice. |
 | **Non-root.** `USER` with a fixed numeric UID. Files root-owned and not writable by that user unless the application writes there. No setuid binaries added. Runtime writes go to a volume or `/tmp`, so the deployment can set `readOnlyRootFilesystem`. | A compromised process can't rewrite its own code or the OS. A numeric UID lets Kubernetes enforce `runAsNonRoot`. |
 | **Clean context and layers.** A `.dockerignore`. No secrets in any layer (`RUN --mount=type=secret` for build secrets, nothing generated at build time that must stay private). No `ADD <url>`: downloads check a pinned checksum, or the checksum the upstream publishes next to the file when Renovate moves the version. | Layers can't be edited after the fact, and a public image is public. |
 | **Labelled, scanned, signed.** The pipeline sets `org.opencontainers.image.source`, `.revision` and, on releases, `.version`; release builds get a Trivy report and a cosign signature (see the contract above). | Anyone can tell where an image came from, what it contains, and that this pipeline built it. |
@@ -94,11 +94,6 @@ Python images share one pattern: a build stage runs a pinned uv,
 is the same `python:<version>-alpine` or `-slim` digest with `/opt/venv`
 copied in, pip and ensurepip removed, a non-root UID, and the entry point
 from the virtualenv.
-
-PHP images build `vendor/` in a composer stage, and their runtime stage
-purges the compilers the official `php` image keeps for
-`docker-php-ext-install`. Apache listens on `${PORT}` from its config, so
-it runs as `www-data` (UID 33) without editing `/etc` at start.
 
 ### Image policy check
 
@@ -174,7 +169,7 @@ lowest first:
 |---|---|---|
 | 1 | Narrow weekly groups: GitHub Actions, the `mbologna/.github` pin, non-major PyPI and npm, uv, OpenTofu, dev tooling, Terraform providers, pre-commit hooks, Helm charts | A branch per group in infra only, the one repository outside the maintenance group (it merges one PR per app in its own window). Elsewhere, row 2 takes these updates |
 | 2 | **Maintenance**: patch, minor and digest updates, Saturday or Sunday, automerge | One branch for row 1's updates and every other non-major one |
-| 3 | `hugo`, `python`, `php` | Every pin of Hugo, or of the language version (base image tag, CI input, setup action input), in one PR as soon as its age gate passes: a new version gets its own CI run and a failure doesn't hold the week's batch. A repository can add its own pins to these groups (a Hugo site adds Dart Sass) |
+| 3 | `hugo`, `python` | Every pin of Hugo, or of the language version (base image tag, CI input, setup action input), in one PR as soon as its age gate passes: a new version gets its own CI run and a failure doesn't hold the week's batch. A repository can add its own pins to these groups (a Hugo site adds Dart Sass) |
 | 4 | Docker base images | Third-party base-image digests in one PR per rebuild wave, unscheduled: the merge is what lets auto-release ship a CVE fix |
 | 5 | Majors | One PR each (`groupName: null`), automerged after 30 days for the low-risk kinds, a person for the rest |
 | 6 | Manual rules (digest-pinned ghcr version bumps, branch commits) | One PR each, for a person |
@@ -294,13 +289,6 @@ the threshold to the project's coverage config, `fail_under` under
 `[tool.coverage.report]` in `pyproject.toml`, which pytest-cov reads on its
 own; with neither, there is no gate. The config is the better place: the
 threshold then lives next to the code and applies to local runs too.
-
-### php-ci.yml
-
-`PHP <version>` (composer install, `composer audit --locked --no-dev`, tests)
-and an optional `Lint PHP`. Inputs: `php_version`, `php_extensions`,
-`composer_options`, `enable_composer_cache`, `pre_test_command`,
-`test_command`, `enable_test`, `enable_lint`, `lint_command`, `lint_tools`.
 
 ### go-ci.yml
 
