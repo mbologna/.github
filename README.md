@@ -162,6 +162,40 @@ Automerge has no schedule (`automergeSchedule: at any time`): the forge
 merges a PR as soon as its required checks pass. A repository with a merge
 window sets its own `automergeSchedule` and `platformAutomerge: false`.
 
+### Groups
+
+Each repository gets at most one weekly maintenance PR, `chore(deps): update
+dependencies (maintenance)`, with every patch, minor and digest update that
+has no group of its own. Renovate applies package rules in order and the last
+`groupName` wins, so the order of the rules in the preset is the precedence,
+lowest first:
+
+| Order | Rule | Effect |
+|---|---|---|
+| 1 | Narrow weekly groups: GitHub Actions, the `mbologna/.github` pin, non-major PyPI and npm, uv, OpenTofu, dev tooling, Terraform providers, pre-commit hooks, Helm charts | A branch per group in infra only, the one repository outside the maintenance group (it merges one PR per app in its own window). Elsewhere, row 2 takes these updates |
+| 2 | **Maintenance**: patch, minor and digest updates, Saturday or Sunday, automerge | One branch for row 1's updates and every other non-major one |
+| 3 | `hugo`, `python`, `php` | Every pin of Hugo, or of the language version (base image tag, CI input, setup action input), in one PR as soon as its age gate passes: a new version gets its own CI run and a failure doesn't hold the week's batch. A repository can add its own pins to these groups (a Hugo site adds Dart Sass) |
+| 4 | Docker base images | Third-party base-image digests in one PR per rebuild wave, unscheduled: the merge is what lets auto-release ship a CVE fix |
+| 5 | Majors | One PR each (`groupName: null`), automerged after 30 days for the low-risk kinds, a person for the rest |
+| 6 | Manual rules (digest-pinned ghcr version bumps, branch commits) | One PR each, for a person |
+| last | Security fixes (`vulnerabilityAlerts`) | One PR each, at any time; Renovate applies this block after every rule |
+
+Lock file maintenance is always a branch of its own, on the same weekend
+schedule.
+
+A group never mixes updates that automerge with updates that wait for a
+person: one manual member would hold the whole PR. The maintenance group's
+name comes from the label, so an update whose rule sets the `manual-review`
+label lands in a separate `dependencies (maintenance, manual review)` PR. A
+repository rule that turns `automerge` off must therefore also set
+`labels: ["dependencies", "manual-review"]`, as every manual rule in the
+preset does. A repository rule with its own `groupName` comes after the
+preset's and wins.
+
+The maintenance branch is rebuilt only on the schedule days
+(`updateNotScheduled: false`), so a release published midweek doesn't restart
+its CI before the weekend.
+
 ## Reusable workflows
 
 Check names (`<caller job> / <job name>`) are what the repositories' rulesets
