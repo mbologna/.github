@@ -19,7 +19,7 @@ GitLab:
 |---|---|
 | Pull request | Title check (a Conventional Commit, since the squash-merge subject is the PR title and auto-release reads it). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push and the image policy check, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
 | Push to the default branch | Security check only: auto-release's `security` strategy releases a CVE fix at once, including a fresh rebuild when the last release is a week old and its image has fixable findings in packages it installs on top of its base. Nothing is built, except with `publish: push` (the Cloud Run repositories, which deploy every push that changes the image). |
-| Monday 06:00 UTC schedule | Conventional release: auto-release tags `vX.Y.Z` when a `feat`, `fix`, `perf`, `revert` or breaking commit landed since the last tag, or a fresh rebuild is due. |
+| Monday 06:00 UTC schedule | Conventional release: auto-release tags `vX.Y.Z` when a `feat`, `fix`, `perf`, `revert` or breaking commit landed since the last tag, or a fresh rebuild is due. Nothing is built or linted, with either `publish` mode: the tag it creates builds. |
 | Release tag `vX.Y.Z` | Build, the image policy check, and push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
 
 What differs from GitLab, on purpose:
@@ -178,7 +178,7 @@ and `gcp-deploy.yml` as nested jobs.
 | Input | Default | Meaning |
 |---|---|---|
 | `image_name` | required | Image name without registry |
-| `publish` | `push` | `release`: only `v*` tags push, and `latest` goes to the newest release. `push`: the default branch, schedules and tags push (the Cloud Run repositories) |
+| `publish` | `push` | `release`: only `v*` tags push, and `latest` goes to the newest release. `push`: the default branch and tags push (the Cloud Run repositories). A schedule builds nothing in either mode; it only runs auto-release |
 | `skip_paths` | `.github/*`, `docs/*`, `tests/*`, `*.md`, `renovate.json`, `.pre-commit-config.yaml`, `.gitignore`, `LICENSE` | A pull request or branch push whose changed files all match builds nothing |
 | `dockerfile` | `Dockerfile` | Dockerfile path |
 | `allowed_tools` | empty | Tools the image policy check lets the image keep on its binary paths, separated by spaces or commas (see [Container images](#container-images)) |
