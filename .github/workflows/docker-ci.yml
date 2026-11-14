@@ -77,8 +77,9 @@ on:
         default: ""
       publish:
         description: >-
-          When to push the image. 'push': on the default branch, on schedule and
-          on tags; other branches and pull requests build without pushing.
+          When to push the image. 'push': on the default branch and on tags;
+          other branches and pull requests build without pushing, and a
+          schedule builds nothing (it only runs auto-release).
           'release': only on v* tags (pushed, or dispatched on the tag ref, as
           auto-release does); pull requests build without pushing and branch
           pushes only lint, and latest moves to the newest release.
@@ -91,8 +92,8 @@ on:
           [[ == ]] patterns: * also matches /). A pull request or branch push
           whose changed files all match builds nothing, so a docs- or CI-only
           change neither checks nor publishes (nor deploys, in a push-mode
-          caller) an image. Tags, schedules and manual runs always build, and so
-          does anything the compare API can't answer (a new branch, a
+          caller) an image. Tags and manual runs always build (schedules never
+          do), and so does anything the compare API can't answer (a new branch, a
           force-push, over 300 files).
         required: false
         type: string
@@ -188,8 +189,7 @@ jobs:
     steps:
       # Every later job keys off the build and push outputs, so nothing that
       # expects a pushed digest (merge, scans, signing, tests, cleanup,
-      # deploy) runs when nothing was pushed. A schedule event carries no
-      # repository payload, but always runs on the default branch.
+      # deploy) runs when nothing was pushed.
       - name: Decide what to build and push
         id: plan
         env:
@@ -208,11 +208,21 @@ jobs:
           fi
           build=true
           push=false
+          lint=true
           if [ "$EVENT" = pull_request ]; then
             : # build to check the Dockerfile, never push
+          elif [ "$EVENT" = schedule ]; then
+            # Monday's schedule only runs the nested auto-release job, which
+            # needs this run to finish, not to build: a release it tags builds
+            # on the tag. A push-mode caller used to build and push a sha-*
+            # image here every week that nothing deployed (the deploy job runs
+            # on pushes and manual runs only). The commit on main was linted
+            # when it landed.
+            build=false
+            lint=false
           elif [ "$PUBLISH" = release ]; then
             if [[ $GITHUB_REF == refs/tags/v* ]]; then push=true; else build=false; fi
-          elif [[ $GITHUB_REF == refs/tags/* || $GITHUB_REF == "$DEFAULT_REF" || $EVENT == schedule ]]; then
+          elif [[ $GITHUB_REF == refs/tags/* || $GITHUB_REF == "$DEFAULT_REF" ]]; then
             push=true
           fi
           # The changed files of a pull request or branch push. Tags,
@@ -252,7 +262,7 @@ jobs:
             fi
           fi
           # hadolint only when the Dockerfile (or its config) changed.
-          hadolint=true
+          hadolint=$lint
           if [ "$known" = true ]; then
             hadolint=false
             while IFS= read -r f; do
@@ -261,14 +271,16 @@ jobs:
               esac
             done <<< "$files"
           fi
-          echo "publish=${PUBLISH} event=${EVENT} ref=${GITHUB_REF}: build=${build} push=${push} hadolint=${hadolint}"
+          echo "publish=${PUBLISH} event=${EVENT} ref=${GITHUB_REF}: build=${build} push=${push} lint=${lint} hadolint=${hadolint}"
           {
             echo "build=${build}"
             echo "push=${push}"
+            echo "lint=${lint}"
             echo "hadolint=${hadolint}"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.plan.outputs.lint == 'true'
 
       - name: Hadolint
         if: steps.plan.outputs.hadolint == 'true'
@@ -283,6 +295,7 @@ jobs:
           override-error: DL3006,DL3007
 
       - name: yamllint
+        if: steps.plan.outputs.lint == 'true'
         uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3
         with:
           file_or_dir: ${{ inputs.yamllint_paths }}
