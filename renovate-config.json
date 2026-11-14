@@ -529,7 +529,7 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run, so no stability window; automerge on green CI, no reviewer. 1-minute floor (not 0 days) ensures Renovate posts a stability check on every branch. timestamp-optional because github-digest SHAs carry no releaseTimestamp. commitMessageExtra includes newDigestShort so each PR title is unique (without it Renovate disables automerge on later PRs with the same title). MUST be placed after the github-actions digest rule so its commitMessageExtra wins. Weekly (Saturday or Sunday), and updateNotScheduled false: .github gets commits most days, and Renovate otherwise rebased every consumer's open pin PR after each of them, which was half of all builds on Renovate branches; now the branch moves only on the schedule days. An urgent workflow fix needs a manual merge in the repos that need it.",
+      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run, so no stability window; automerge on green CI, no reviewer. 1-minute floor (not 0 days) ensures Renovate posts a stability check on every branch. timestamp-optional because github-digest SHAs carry no releaseTimestamp. commitMessageExtra includes newDigestShort so each PR title is unique (without it Renovate disables automerge on later PRs with the same title). MUST be placed after the github-actions digest rule so its commitMessageExtra wins. Weekly (Saturday or Sunday), and updateNotScheduled false: .github gets commits most days, and Renovate otherwise rebased every consumer's open pin PR after each of them, which was half of all builds on Renovate branches; now the branch moves only on the schedule days. An urgent workflow fix needs a manual merge in the repos that need it. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchManagers": [
         "github-actions"
       ],
@@ -563,7 +563,7 @@
       "minimumReleaseAge": "7 days"
     },
     {
-      "description": "One weekly PR per repository for all GitHub Actions updates (majors still separate), opened on Saturday or Sunday and merged once CI passes: patch, minor and digest updates of every publisher automerge after their age gate (patch 7 days, minor 14, digest 7), because every action is SHA-pinned and the gate gives others time to notice a hijacked release. Majors are decided at the end (trusted publishers' majors automerge after 30 days; every other publisher's wait for a person). Not mbologna/.github's own reusable workflows, which have their own weekly rule, and not the runtime version inputs (setup-python's python-version and friends), which join their language's group.",
+      "description": "One weekly PR per repository for all GitHub Actions updates (majors still separate), opened on Saturday or Sunday and merged once CI passes: patch, minor and digest updates of every publisher automerge after their age gate (patch 7 days, minor 14, digest 7), because every action is SHA-pinned and the gate gives others time to notice a hijacked release. Majors are decided at the end (trusted publishers' majors automerge after 30 days; every other publisher's wait for a person). Not mbologna/.github's own reusable workflows, which have their own weekly rule, and not the runtime version inputs (setup-python's python-version and friends), which join their language's group. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchManagers": [
         "github-actions"
       ],
@@ -953,7 +953,7 @@
       "extractVersion": "^kustomize/v(?<version>.+)$"
     },
     {
-      "description": "Non-major PyPI and npm updates: one PR a week per repository, opened on Saturday or Sunday. Each was its own PR and its own CI run (on GitLab, on the self-hosted runner, two jobs at a time). Placed before the preset's other groups, so the uv, python, dev tooling and Docker base images groups still win for their members. Majors keep their own PR; security fixes are separate branches and never grouped.",
+      "description": "Non-major PyPI and npm updates: one PR a week per repository, opened on Saturday or Sunday. Each was its own PR and its own CI run (on GitLab, on the self-hosted runner, two jobs at a time). Placed before the preset's other groups, so the uv, python, dev tooling and Docker base images groups still win for their members. Majors keep their own PR; security fixes are separate branches and never grouped. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchDatasources": [
         "pypi",
         "npm"
@@ -968,49 +968,14 @@
       ]
     },
     {
-      "description": "One PR for every OpenTofu pin: CI install steps and .opentofu-version files",
+      "description": "One PR for every OpenTofu pin: CI install steps and .opentofu-version files Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchDepNames": [
         "opentofu/opentofu"
       ],
       "groupName": "opentofu"
     },
     {
-      "description": "Python in one PR per repository: the Dockerfile's base image, the GitLab CI test image, the reusable workflows' python_version input and setup-python's python-version. They are the same language version, and separate PRs left CI testing 3.14 while the images ran 3.15 (5 repositories, 2026-11). Digest updates stay in the Docker base images group. A minor (3.15 to 3.16) is a new language version that removes deprecated APIs; it automerges like any minor because CI's version moves in the same PR, so green CI means the new version passed the tests.",
-      "matchDepNames": [
-        "python",
-        "docker.io/library/python"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor",
-        "patch"
-      ],
-      "groupName": "python"
-    },
-    {
-      "description": "PHP in one PR per repository, for the same reason as the Python group: the Dockerfile's base image and the reusable php-ci workflow's php_version input.",
-      "matchDepNames": [
-        "php",
-        "docker.io/library/php"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor",
-        "patch"
-      ],
-      "groupName": "php"
-    },
-    {
-      "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo). Patches and minors automerge after their age gate: the caller's hugo-pr-build workflow builds the site with the new version, deploys a preview and checks it before merge, which catches what a release could break (a minor's template or default changes included). MUST come after the regex and github-actions rules above so its title wins.",
-      "matchPackageNames": [
-        "gohugoio/hugo"
-      ],
-      "groupName": "hugo",
-      "commitMessageTopic": "hugo",
-      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
-    },
-    {
-      "description": "uv: one PR per uv release for every place a repository pins it: uv from PyPI in requirements-uv.txt (hash-pinned, installed with pip in a Dockerfile's build stage), the uv image where a Dockerfile still copies it (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. One PR a week, opened on Saturday or Sunday: the PyPI members would get that schedule from the non-major dependencies group anyway, and the setup-uv input from the github-actions group, so the whole group shares it. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. Dockerfiles take uv from PyPI because PyPI gives the release date the digest-pinned ghcr.io image lacks: that image's updates could not be age-gated and waited for a person in every repository (the date-less digest-pinned rule), while the PyPI uv waits out the usual age gate and automerges; the pip_requirements manager refreshes the hashes. After the ghcr.io override rules, which must not lose the image's lookup.",
+      "description": "uv: one PR per uv release for every place a repository pins it: uv from PyPI in requirements-uv.txt (hash-pinned, installed with pip in a Dockerfile's build stage), the uv image where a Dockerfile still copies it (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. One PR a week, opened on Saturday or Sunday: the PyPI members would get that schedule from the non-major dependencies group anyway, and the setup-uv input from the github-actions group, so the whole group shares it. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. Dockerfiles take uv from PyPI because PyPI gives the release date the digest-pinned ghcr.io image lacks: that image's updates could not be age-gated and waited for a person in every repository (the date-less digest-pinned rule), while the PyPI uv waits out the usual age gate and automerges; the pip_requirements manager refreshes the hashes. After the ghcr.io override rules, which must not lose the image's lookup. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchDepNames": [
         "uv",
         "ghcr.io/astral-sh/uv",
@@ -1023,22 +988,7 @@
       ]
     },
     {
-      "description": "Third-party base-image digests (Dockerfile, compose and GitLab CI job image rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy compares the old and new base images with Trivy and releases at once when fixable HIGH/CRITICAL CVEs are gone, so holding it would delay CVE fixes by up to a week. A merge builds nothing by itself: images are built when a release ships. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds.",
-      "matchManagers": [
-        "dockerfile",
-        "docker-compose",
-        "gitlabci"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
-      "matchPackageNames": [
-        "!**/mbologna/**"
-      ],
-      "groupName": "Docker base images"
-    },
-    {
-      "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened on Saturday or Sunday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR.",
+      "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened on Saturday or Sunday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchManagers": [
         "npm",
         "composer"
@@ -1057,7 +1007,7 @@
       ]
     },
     {
-      "description": "Terraform providers: one PR a week per repository, opened on Saturday or Sunday. A merge deploys nothing (tofu apply is a separate step), and each provider had its own PR. Patch and minor only: a major keeps its own PR, where the repository asks for a plan before merging.",
+      "description": "Terraform providers: one PR a week per repository, opened on Saturday or Sunday. A merge deploys nothing (tofu apply is a separate step), and each provider had its own PR. Patch and minor only: a major keeps its own PR, where the repository asks for a plan before merging. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchManagers": [
         "terraform"
       ],
@@ -1071,7 +1021,7 @@
       ]
     },
     {
-      "description": "pre-commit hook version bumps: one PR a week per repository, opened on Saturday or Sunday, like the other tooling groups. They only change local and CI checks. Digest updates keep their own manual rule (a moved tag).",
+      "description": "pre-commit hook version bumps: one PR a week per repository, opened on Saturday or Sunday, like the other tooling groups. They only change local and CI checks. Digest updates keep their own manual rule (a moved tag). Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchManagers": [
         "pre-commit"
       ],
@@ -1085,7 +1035,7 @@
       ]
     },
     {
-      "description": "Helm chart patch and minor updates: one PR a week per repository, opened on Saturday or Sunday, instead of a chain of PRs as a chart moves 10.9.7, 10.10.3, 10.10.5 in a week. A repository whose image scanner expedites single chart PRs sets groupName null for helm and keeps the weekly schedule.",
+      "description": "Helm chart patch and minor updates: one PR a week per repository, opened on Saturday or Sunday, instead of a chain of PRs as a chart moves 10.9.7, 10.10.3, 10.10.5 in a week. A repository whose image scanner expedites single chart PRs sets groupName null for helm and keeps the weekly schedule. Where the maintenance group applies (every repository but infra; see that rule) these updates ride in its PR instead, so this group only takes effect in infra.",
       "matchDatasources": [
         "helm"
       ],
@@ -1097,6 +1047,73 @@
       "schedule": [
         "* * * * 0,6"
       ]
+    },
+    {
+      "description": "One maintenance PR a week per repository: every patch, minor and digest update that has no group of its own below, opened on Saturday or Sunday so it merges before Monday's release run (auto-release turns runtime changes into a maintenance release). It replaces the weekly groups above (GitHub Actions, the mbologna/.github pin, non-major PyPI and npm, uv, OpenTofu, dev tooling, Terraform providers, pre-commit hooks, Helm charts), which were up to eight weekly PRs and pipelines per repository; members that must move together (uv's PyPI package, build backend and setup-uv input) still do, on one branch. Placed after them, so it wins. What stays out: the hugo, python and php groups and the Docker base images group, placed after this rule so they win (a repository adds its own pins to the hugo group; a language version or a base-image rebuild gets its own PR and its own green CI; a rebuild is not held for the weekend because its merge is what releases a CVE fix); majors, which keep one PR each (the major rules at the end set groupName null or leave them ungrouped); security fixes, whose vulnerabilityAlerts block is applied last with groupName null and no schedule; lock file maintenance, always its own branch. Never automerge and manual review in one branch: the name depends on the label, so an update that a rule sends to a person (the manual-review label, which every manual rule sets, in this preset and in the repositories) lands in a separate 'maintenance, manual review' PR, and the preset's own manual rules after this one take updates out of every group. A repository rule that turns automerge off must also set the manual-review label, or the whole maintenance PR waits for a person. updateNotScheduled false: the branch is only rebuilt on the schedule days, so an update released on a Tuesday doesn't restart the PR's CI until the weekend. Not infra, which merges one PR per app in its own window and keeps the narrower groups.",
+      "matchRepositories": [
+        "!mbologna/infra"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "groupName": "{{#if (includes labels 'automerge')}}dependencies (maintenance){{else}}dependencies (maintenance, manual review){{/if}}",
+      "groupSlug": "{{#if (includes labels 'automerge')}}maintenance{{else}}maintenance-manual-review{{/if}}",
+      "schedule": [
+        "* * * * 0,6"
+      ],
+      "updateNotScheduled": false
+    },
+    {
+      "description": "Hugo: one PR for all pins (workflow inputs, reusable workflow defaults, actions-hugo). Patches and minors automerge after their age gate: the caller's hugo-pr-build workflow builds the site with the new version, deploys a preview and checks it before merge, which catches what a release could break (a minor's template or default changes included). MUST come after the regex and github-actions rules above so its title wins. After the maintenance group, so it wins: a repository can add its own pins to the group (Dart Sass, in a Hugo site), and they must stay on Hugo's branch.",
+      "matchPackageNames": [
+        "gohugoio/hugo"
+      ],
+      "groupName": "hugo",
+      "commitMessageTopic": "hugo",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
+      "description": "Python in one PR per repository: the Dockerfile's base image, the GitLab CI test image, the reusable workflows' python_version input and setup-python's python-version. They are the same language version, and separate PRs left CI testing 3.14 while the images ran 3.15 (5 repositories, 2026-11). Digest updates stay in the Docker base images group. A minor (3.15 to 3.16) is a new language version that removes deprecated APIs; it automerges like any minor because CI's version moves in the same PR, so green CI means the new version passed the tests. After the maintenance group, so it wins: a new language version gets its own PR and its own CI run, and a failure there doesn't hold the week's other updates.",
+      "matchDepNames": [
+        "python",
+        "docker.io/library/python"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "groupName": "python"
+    },
+    {
+      "description": "PHP in one PR per repository, for the same reason as the Python group: the Dockerfile's base image and the reusable php-ci workflow's php_version input. After the maintenance group, so it wins, like the python group.",
+      "matchDepNames": [
+        "php",
+        "docker.io/library/php"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "groupName": "php"
+    },
+    {
+      "description": "Third-party base-image digests (Dockerfile, compose and GitLab CI job image rebuilds of php, python, buildpack-deps, leap, docker/dockerfile, ...): one PR per rebuild wave instead of one per image. Not weekly: a rebuild often carries OS security fixes, and its merge is the push on which auto-release's security strategy compares the old and new base images with Trivy and releases at once when fixable HIGH/CRITICAL CVEs are gone, so holding it would delay CVE fixes by up to a week. A merge builds nothing by itself: images are built when a release ships. Own images (mbologna/) are left out: they are own builds, not upstream rebuilds. After the maintenance group, so it wins and keeps its unscheduled, per-wave PRs.",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose",
+        "gitlabci"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "matchPackageNames": [
+        "!**/mbologna/**"
+      ],
+      "groupName": "Docker base images"
     },
     {
       "description": "Lock file maintenance automerges where the package manager holds the refresh to releases at least 7 days old: npm (install --before), Poetry (POETRY_SOLVER_MIN_RELEASE_AGE), uv.lock under pep621, whose consumers all set [tool.uv] exclude-newer = \"7 days\", and pip-compile, whose lock Renovate regenerates with the command in its header, so a repository that enables the pip-compile manager compiles with uv pip compile --exclude-newer P7D. A repository whose lock lacks that setting must add it before relying on this rule. Composer, cargo, bundler and the rest take whatever is newest, so they keep the manual review at the end.",
@@ -1133,7 +1150,7 @@
       ]
     },
     {
-      "description": "Low-risk majors automerge after the 30-day hold, on green CI: the trusted publishers' GitHub Actions (actions/*, github/*, docker/*, astral-sh/*, google-github-actions/*, sigstore/*, peaceiris/*; their majors are almost always a new Node runtime for the action), GitHub-hosted runner images (ubuntu-24.04 to 26.04) and my own packages (anything under mbologna/, whose majors I wrote). Runtime version inputs (depType uses-with) are excluded: they are language versions. Must come right before the manual major rule, which excludes the same set.",
+      "description": "Low-risk majors automerge after the 30-day hold, on green CI: the trusted publishers' GitHub Actions (actions/*, github/*, docker/*, astral-sh/*, google-github-actions/*, sigstore/*, peaceiris/*; their majors are almost always a new Node runtime for the action), GitHub-hosted runner images (ubuntu-24.04 to 26.04) and my own packages (anything under mbologna/, whose majors I wrote). Runtime version inputs (depType uses-with) are excluded: they are language versions. Must come right before the manual major rule, which excludes the same set. groupName null: each major gets its own PR, never a group's major branch (the GitHub Actions group used to bundle the trusted publishers' majors); a repository's lock-step group comes later and still keeps its majors together.",
       "matchUpdateTypes": [
         "major"
       ],
@@ -1144,7 +1161,8 @@
       "labels": [
         "dependencies",
         "automerge"
-      ]
+      ],
+      "groupName": null
     },
     {
       "description": "Every other major waits for a person after its 30-day hold. The manual rules come last and nothing after them turns automerge back on, so the label and the PR note always agree with what happens (prBodyNotes and addLabels are appended across matching rules and cannot be taken back by a later one). groupName null: a manual major gets its own PR, so it can never share a branch with updates that automerge (a group automerges only when every member may, and carries the union of their labels, which is how ci-templates MRs once showed both automerge and manual-review). Repository rules come later, so a lock-step group in a repository keeps its majors together.",
@@ -1178,7 +1196,7 @@
       "enabled": false
     },
     {
-      "description": "Date-less registries, digest-pinned: ghcr.io tag@sha256 pins stay on the docker datasource (parts 1-5 skip them), which resolves real image digests but gives no release dates. A version bump therefore cannot be age-gated: it opens a PR for a person to review instead of sitting in Pending Status Checks unseen. Same-tag digest updates keep the digest rules.",
+      "description": "Date-less registries, digest-pinned: ghcr.io tag@sha256 pins stay on the docker datasource (parts 1-5 skip them), which resolves real image digests but gives no release dates. A version bump therefore cannot be age-gated: it opens a PR for a person to review instead of sitting in Pending Status Checks unseen. Same-tag digest updates keep the digest rules. groupName null: a version bump that waits for a person gets its own PR, so it never joins the maintenance group.",
       "matchDatasources": [
         "docker"
       ],
@@ -1202,7 +1220,8 @@
       ],
       "prBodyNotes": [
         "**Why this waits for you:** the registry gives no release dates, so no age gate could apply. Read the upstream release notes before merging."
-      ]
+      ],
+      "groupName": null
     },
     {
       "description": "Lock file maintenance for package managers that cannot hold a refresh to releases at least 7 days old (cargo, bundler, ...): a person merges it, once a month (days 1-3, so the GitHub app gets more than one chance to open it). composer is off altogether (the composer manager block): php-ci runs composer audit instead, so a vulnerable transitive package turns CI red rather than an ungated refresh merging. npm, Poetry, pep621 (uv.lock) and pip-compile locks are gated and automerge (the lock file rule above, and repository rules).",
@@ -1231,7 +1250,7 @@
       ]
     },
     {
-      "description": "Dependencies pinned to a branch's commit (the git-refs datasource: a '# renovate:' comment names the branch, and the new HEAD comes as a digest update). A commit has no release date, so no age gate can hold it, and it would automerge as soon as CI passed. A person reviews each one. A repository can group them and give them a weekly schedule.",
+      "description": "Dependencies pinned to a branch's commit (the git-refs datasource: a '# renovate:' comment names the branch, and the new HEAD comes as a digest update). A commit has no release date, so no age gate can hold it, and it would automerge as soon as CI passed. A person reviews each one. A repository can group them and give them a weekly schedule. groupName null: each one gets its own PR (a repository rule that groups them comes later and wins), never the maintenance group's.",
       "matchDatasources": [
         "git-refs"
       ],
@@ -1245,7 +1264,8 @@
       ],
       "prBodyNotes": [
         "**Why this waits for you:** a new commit on a branch the repository follows. It has no release, no release date and no age gate; read the upstream commits before merging."
-      ]
+      ],
+      "groupName": null
     }
   ]
 }
