@@ -13,6 +13,14 @@ on:
         required: false
         type: string
         default: -race
+      coverage_fail_under:
+        description: >-
+          Minimum total statement coverage across all packages, in percent,
+          below which the Test job fails (go test -coverprofile, then go tool
+          cover -func). Empty (the default) runs the tests without coverage.
+        required: false
+        type: string
+        default: ""
 
 jobs:
   lint:
@@ -68,5 +76,29 @@ jobs:
       - name: Build
         run: go build ./...
 
+      # The coverage gate, on the total over every package: packages without
+      # tests count as uncovered.
       - name: Test
-        run: go test ${{ inputs.test_flags }} ./...
+        env:
+          TEST_FLAGS: ${{ inputs.test_flags }}
+          FAIL_UNDER: ${{ inputs.coverage_fail_under }}
+        run: |
+          set -euo pipefail
+          if [ -z "$FAIL_UNDER" ]; then
+            # shellcheck disable=SC2086 # test_flags is a list of flags
+            go test $TEST_FLAGS ./...
+            exit 0
+          fi
+          if ! [[ $FAIL_UNDER =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::coverage_fail_under must be a number of percent, not '${FAIL_UNDER}'"
+            exit 1
+          fi
+          profile="${RUNNER_TEMP}/coverage.out"
+          # shellcheck disable=SC2086 # test_flags is a list of flags
+          go test $TEST_FLAGS -coverprofile="$profile" ./...
+          total=$(go tool cover -func="$profile" | awk '$1 == "total:" { sub(/%/, "", $NF); print $NF }')
+          echo "Total coverage: ${total}%, gate: ${FAIL_UNDER}% (coverage_fail_under input)"
+          if awk -v t="$total" -v m="$FAIL_UNDER" 'BEGIN { exit !(t + 0 < m + 0) }'; then
+            echo "::error::Total coverage ${total}% is below coverage_fail_under (${FAIL_UNDER}%)"
+            exit 1
+          fi

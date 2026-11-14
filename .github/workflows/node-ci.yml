@@ -23,6 +23,16 @@ on:
         required: false
         type: string
         default: test
+      coverage_fail_under:
+        description: >-
+          Minimum line coverage, in percent, below which the test job fails.
+          The test script must run node --test (Node.js 22.8 or later): the
+          workflow adds --experimental-test-coverage and
+          --test-coverage-lines to it, and fails when no coverage report
+          comes out. Empty (the default) runs the tests without coverage.
+        required: false
+        type: string
+        default: ""
       enable_audit:
         description: Run npm audit after install
         required: false
@@ -90,9 +100,47 @@ jobs:
         run: ${{ inputs.package_manager }} run lint
         continue-on-error: true
 
+      # The coverage gate. node refuses the test runner's coverage flags in
+      # NODE_OPTIONS and ignores them after the file arguments, so a node shim
+      # first on PATH adds them to every node --test the test script starts,
+      # whatever its arguments (and its pre and post scripts still run).
       - name: Test
         if: inputs.test_command != ''
-        run: ${{ inputs.package_manager }} run ${{ inputs.test_command }}
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package_manager }}
+          TEST_COMMAND: ${{ inputs.test_command }}
+          FAIL_UNDER: ${{ inputs.coverage_fail_under }}
+        run: |
+          set -euo pipefail
+          # test_command may carry arguments (test -- --flag), as before.
+          read -ra test_command <<< "$TEST_COMMAND"
+          if [ -z "$FAIL_UNDER" ]; then
+            "$PACKAGE_MANAGER" run "${test_command[@]}"
+            exit 0
+          fi
+          if ! [[ $FAIL_UNDER =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::coverage_fail_under must be a number of percent, not '${FAIL_UNDER}'"
+            exit 1
+          fi
+          echo "Coverage gate: ${FAIL_UNDER}% of lines (coverage_fail_under input)"
+          shim="${RUNNER_TEMP}/node-coverage"
+          mkdir -p "$shim"
+          node_bin=$(command -v node)
+          cat > "${shim}/node" <<EOF
+          #!/bin/sh
+          for arg; do
+            if [ "\$arg" = --test ]; then
+              exec "${node_bin}" --experimental-test-coverage --test-coverage-lines="${FAIL_UNDER}" "\$@"
+            fi
+          done
+          exec "${node_bin}" "\$@"
+          EOF
+          chmod +x "${shim}/node"
+          PATH="${shim}:${PATH}" "$PACKAGE_MANAGER" run "${test_command[@]}" 2>&1 | tee "${RUNNER_TEMP}/test.log"
+          if ! grep -q 'start of coverage report' "${RUNNER_TEMP}/test.log"; then
+            echo "::error::coverage_fail_under is set, but the test script printed no coverage report: it must run node --test."
+            exit 1
+          fi
 
   build:
     name: Build

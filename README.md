@@ -263,8 +263,15 @@ pip-audit on the locked runtime dependencies:
 `uv export --frozen --no-dev --no-emit-project --no-hashes --format requirements-txt | uvx pip-audit==<pin> -r /dev/stdin --no-deps --disable-pip`).
 uv only, with `uv sync --locked`, so a stale `uv.lock` fails. Inputs:
 `python_version` (default `3.15`; callers set the Python their Dockerfile
-ships), `enable_codecov` (default `true`), `pip_audit_version` (tracked by
-Renovate; callers leave it).
+ships), `coverage_fail_under`, `enable_codecov` (default `true`),
+`pip_audit_version` (tracked by Renovate; callers leave it).
+
+The coverage gate: pytest runs with `--cov`, and fails below
+`coverage_fail_under` percent of total coverage. Empty (the default) leaves
+the threshold to the project's coverage config, `fail_under` under
+`[tool.coverage.report]` in `pyproject.toml`, which pytest-cov reads on its
+own; with neither, there is no gate. The config is the better place: the
+threshold then lives next to the code and applies to local runs too.
 
 ### php-ci.yml
 
@@ -276,15 +283,28 @@ and an optional `Lint PHP`. Inputs: `php_version`, `php_extensions`,
 ### go-ci.yml
 
 `Lint` and `Test`. Inputs: `go_version_file` (default `go.mod`), `test_flags`
-(default `-race`).
+(default `-race`), `coverage_fail_under` (empty: no gate). With a threshold,
+the tests run with `-coverprofile` and the job fails when the total statement
+coverage over every package (`go tool cover -func`) is below it; a package
+without tests counts as uncovered.
 
 ### node-ci.yml and npm-publish.yml
 
 node-ci: tests on one Node.js version or a matrix, an optional build artifact
 and an optional `npm audit`. Inputs: `node_version`, `node_versions`,
-`package_manager`, `test_command`, `enable_audit`, `audit_level`,
-`audit_omit_dev`, `build_command`, `build_artifact_name`,
+`package_manager`, `test_command`, `coverage_fail_under`, `enable_audit`,
+`audit_level`, `audit_omit_dev`, `build_command`, `build_artifact_name`,
 `build_artifact_path`, `build_artifact_retention_days`.
+
+The coverage gate (`coverage_fail_under`, empty by default: no gate) uses
+Node.js's own test runner coverage, so the test script must run
+`node --test`, on Node.js 22.8 or later. The workflow adds
+`--experimental-test-coverage --test-coverage-lines=<threshold>` to every
+`node --test` the script starts, through a `node` shim on `PATH` (node
+accepts neither flag in `NODE_OPTIONS`, and ignores them after the file
+arguments). The job fails below the threshold, and also when no coverage
+report comes out, so a script that doesn't use `node --test` can't pass the
+gate unchecked.
 
 npm-publish: publishes the tagged version to npm with provenance. Inputs:
 `node_version`, `package_manager`. The caller runs it on the tag build that
