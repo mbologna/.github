@@ -16,6 +16,7 @@
   "automergeSchedule": [
     "at any time"
   ],
+  "internalChecksFilter": "strict",
   "pinDigests": true,
   "osvVulnerabilityAlerts": true,
   "labels": [

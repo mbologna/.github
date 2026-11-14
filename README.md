@@ -158,6 +158,12 @@ Each rule in [`renovate-config.json`](renovate-config.json) carries a
 | Lock file refresh for package managers without an age gate (cargo, bundler, ...) | Days 1-3 of each month, for a person to merge |
 | Everything else | At any time, once its age gate passes |
 
+Age gates filter versions, not PRs (`internalChecksFilter: strict`): an update
+proposes the newest version that has cleared its gate, so a group never waits
+for its youngest member. Without it the weekly maintenance group held every
+update until the newest one in it was old enough, and a steady stream of
+releases (uv's are weekly) could hold a batch indefinitely.
+
 Automerge has no schedule (`automergeSchedule: at any time`): the forge
 merges a PR as soon as its required checks pass. A repository with a merge
 window sets its own `automergeSchedule` and `platformAutomerge: false`.
