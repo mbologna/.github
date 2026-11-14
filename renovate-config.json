@@ -68,6 +68,10 @@
     "enabled": true,
     "pinDigests": false
   },
+  "copier": {
+    "description": "Copier templates (.copier-answers.yml, python-app-template): updates move the _commit tag through `copier update`, which has no way to write a commit SHA. With the preset's pinDigests the manager opened a 'pin dependency' PR that only appended '#copier updated' to the answers file (toggl-insights #40, 2026-11-14).",
+    "pinDigests": false
+  },
   "terraform": {
     "lockFileMaintenance": {
       "enabled": false
