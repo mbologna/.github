@@ -17,10 +17,10 @@ GitLab:
 
 | Event | What runs |
 |---|---|
-| Pull request | Title check (a Conventional Commit, since the squash-merge subject is the PR title and auto-release reads it). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push and the image policy check, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
+| Pull request | Title check (a Conventional Commit, since the squash-merge subject is the PR title and auto-release reads it). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push, the image policy check and the smoke test, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
 | Push to the default branch | Security check only: auto-release's `security` strategy releases a CVE fix at once, including a fresh rebuild when the last release is a week old and its image has fixable findings in packages it installs on top of its base. Nothing is built, except with `publish: push` (the Cloud Run repositories, which deploy every push that changes the image). |
 | Monday 06:00 UTC schedule | Conventional release: auto-release tags `vX.Y.Z` when a `feat`, `fix`, `perf`, `revert` or breaking commit landed since the last tag, or a fresh rebuild is due. Nothing is built or linted, with either `publish` mode: the tag it creates builds. |
-| Release tag `vX.Y.Z` | Build, the image policy check, and push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
+| Release tag `vX.Y.Z` | Build, the image policy check and the smoke test; push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
 
 What differs from GitLab, on purpose:
 
@@ -204,10 +204,31 @@ require, so job names don't change.
 ### docker-ci.yml
 
 Lint (hadolint, yamllint), a native per-platform build (`Build (linux/amd64)`,
-`Build (linux/arm64)`) that ends with the image policy check, the multi-arch
-manifest, SBOM, Trivy, cosign, an
+`Build (linux/arm64)`) that ends with the image policy check and a smoke
+test, the multi-arch manifest, SBOM, Trivy, cosign, an
 optional integration test and GHCR cleanup. Optionally runs `auto-release.yml`
 and `gcp-deploy.yml` as nested jobs.
+
+The smoke test runs each platform's image right after the image policy
+check, loaded from the same OCI layout, with no network and a 120-second
+limit. A failure stops the build job before it exports the digest, so the
+merge job never tags the image: a broken base image or dependency fails the
+pull request that brought it, or the release build, instead of the deploy.
+(With `push` on, the per-platform image is already in GHCR by digest,
+untagged, as with the image policy check; GHCR cleanup deletes untagged
+versions.) `smoke_cmd` decides what runs:
+
+- a shell command, run with `sh -c` in the image instead of its entrypoint,
+  as the image's user: `python -c 'import my_app'`, `my-tool --version`. A
+  non-zero exit fails the build. An application that reads required
+  settings at import time needs them on the command line
+  (`APP_URL=http://example.invalid python -c 'import my_app'`).
+- empty (the default): the image's entrypoint with `--help`. A failure is
+  only a warning: a server never exits, and an image whose entry point needs
+  its environment, or that has only a `CMD`, doesn't exit 0 there. Set
+  `smoke_cmd` to turn the test into a gate.
+- `none`: no smoke test (an image without a shell whose entrypoint can't
+  answer `--help`).
 
 | Input | Default | Meaning |
 |---|---|---|
@@ -218,6 +239,7 @@ and `gcp-deploy.yml` as nested jobs.
 | `allowed_tools` | empty | Tools the image policy check lets the image keep on its binary paths, separated by spaces or commas (see [Container images](#container-images)) |
 | `allow_root` | empty | Why the image runs as root; non-empty lets the image policy check pass a root image and prints the reason |
 | `legacy_image_names` | empty | Former image names that keep getting the same tags |
+| `smoke_cmd` | empty | Smoke test: a shell command that must exit 0 in the built image; empty runs the entrypoint with `--help` and only warns; `none` skips it |
 | `version_command` | empty | Command run in the image that prints a version to tag |
 | `extra_tags` | empty | Extra docker/metadata-action tag rules |
 | `push_to_dockerhub` | `true` | Also push to Docker Hub (`DOCKER_USERNAME`, `DOCKER_PASSWORD`) |
