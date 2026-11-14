@@ -1165,9 +1165,12 @@
       "groupName": null
     },
     {
-      "description": "Every other major waits for a person after its 30-day hold. The manual rules come last and nothing after them turns automerge back on, so the label and the PR note always agree with what happens (prBodyNotes and addLabels are appended across matching rules and cannot be taken back by a later one). groupName null: a manual major gets its own PR, so it can never share a branch with updates that automerge (a group automerges only when every member may, and carries the union of their labels, which is how ci-templates MRs once showed both automerge and manual-review). Repository rules come later, so a lock-step group in a repository keeps its majors together.",
+      "description": "Every other major waits for a person after its 30-day hold, except in mbologna/infra, which since 2026-11-14 automerges third-party majors after the hold and keeps its own denylist of majors that wait (its renovate.json). The manual rules come last and nothing after them turns automerge back on, so the label and the PR note always agree with what happens (prBodyNotes and addLabels are appended across matching rules and cannot be taken back by a later one). groupName null: a manual major gets its own PR, so it can never share a branch with updates that automerge (a group automerges only when every member may, and carries the union of their labels, which is how ci-templates MRs once showed both automerge and manual-review). Repository rules come later, so a lock-step group in a repository keeps its majors together.",
       "matchUpdateTypes": [
         "major"
+      ],
+      "matchRepositories": [
+        "!mbologna/infra"
       ],
       "matchJsonata": [
         "$not($contains($string(packageName), 'mbologna/') or datasource = 'github-runners' or (manager = 'github-actions' and depType != 'uses-with' and $contains($string(packageName), /^(actions|github|docker|astral-sh|google-github-actions|sigstore|peaceiris)\\//)))"
