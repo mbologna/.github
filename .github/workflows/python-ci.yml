@@ -17,6 +17,15 @@ on:
         required: false
         type: boolean
         default: true
+      coverage_fail_under:
+        description: >-
+          Minimum total coverage, in percent, below which the Test job fails
+          (pytest --cov-fail-under). Empty (the default) uses fail_under from
+          the project's coverage config ([tool.coverage.report] in
+          pyproject.toml), and no gate when that isn't set either.
+        required: false
+        type: string
+        default: ""
       pip_audit_version:
         description: >-
           pip-audit version for the dependency audit. Renovate tracks this
@@ -90,8 +99,26 @@ jobs:
           uv export --frozen --no-dev --no-emit-project --no-hashes --format requirements-txt |
             uvx "pip-audit==${PIP_AUDIT_VERSION}" -r /dev/stdin --no-deps --disable-pip
 
+      # The coverage gate: pytest-cov fails the run below --cov-fail-under,
+      # and without the flag it reads fail_under from the coverage config
+      # itself, so an empty input still gates a project that sets one.
       - name: Run tests
-        run: uv run --locked pytest --cov --cov-report=xml --cov-report=term-missing
+        env:
+          FAIL_UNDER: ${{ inputs.coverage_fail_under }}
+        run: |
+          set -euo pipefail
+          gate=()
+          if [ -n "$FAIL_UNDER" ]; then
+            if ! [[ $FAIL_UNDER =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+              echo "::error::coverage_fail_under must be a number of percent, not '${FAIL_UNDER}'"
+              exit 1
+            fi
+            gate=(--cov-fail-under="$FAIL_UNDER")
+            echo "Coverage gate: ${FAIL_UNDER}% (coverage_fail_under input)"
+          else
+            echo "Coverage gate: fail_under from the coverage config, if the project sets one"
+          fi
+          uv run --locked pytest --cov --cov-report=xml --cov-report=term-missing "${gate[@]}"
 
       - name: Upload coverage to Codecov
         if: inputs.enable_codecov
