@@ -40,6 +40,19 @@ on:
         required: false
         type: string
         default: ""
+      smoke_cmd:
+        description: >-
+          Smoke test of each platform's image, run after the image policy
+          check and before the merge job tags anything: a shell command run
+          with sh -c in the image (entrypoint overridden, no network, 120
+          seconds), e.g. "python -c 'import my_app'". A non-zero exit fails
+          the build. Empty (the default) runs the image's entrypoint with
+          --help and only warns when that fails, since a server or an image
+          that needs its environment doesn't exit 0 there; 'none' skips the
+          test (an image without a shell).
+        required: false
+        type: string
+        default: ""
       version_command:
         description: >-
           Optional shell command run inside the built image (linux/amd64) that prints
@@ -382,10 +395,11 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.labels.outputs.labels }}
           # The second output is the same image as an OCI layout directory,
-          # for the image policy check below.
+          # for the image policy check and the smoke test below. Its name is
+          # only what docker load calls the image there.
           outputs: |
             type=image,name=ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }},push-by-digest=true,name-canonical=true,push=${{ needs.lint.outputs.push }}
-            type=oci,dest=${{ runner.temp }}/image-oci,tar=false
+            type=oci,dest=${{ runner.temp }}/image-oci,tar=false,name=smoke.local/${{ inputs.image_name }}:${{ matrix.cache_scope }}
           # Scoped per image: a repository may call this workflow once per image.
           cache-from: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }}
           cache-to: type=gha,scope=${{ inputs.image_name }}-${{ matrix.cache_scope }},mode=max
@@ -571,6 +585,60 @@ jobs:
             echo "::error title=Image policy::The image breaks the container image standard; see this step's log for what and how to declare an exception."
           fi
           exit "$status"
+
+      # Runs the image this job just built, from the OCI layout, so a broken
+      # base image or dependency fails here, on the pull request and before a
+      # release is tagged, instead of at deploy time. A failure stops the job
+      # before the digest is exported, so the merge job never tags it.
+      - name: Smoke test
+        if: needs.lint.outputs.build == 'true' && inputs.smoke_cmd != 'none'
+        env:
+          LAYOUT: ${{ runner.temp }}/image-oci
+          IMAGE_REF: smoke.local/${{ inputs.image_name }}:${{ matrix.cache_scope }}
+          SMOKE_CMD: ${{ inputs.smoke_cmd }}
+          DOCS: https://github.com/mbologna/.github#docker-ciyml
+        run: |
+          set -euo pipefail
+          # Only a recent docker load reads a bare OCI layout (the arm64
+          # runner's took it for the legacy format), so the archive also
+          # carries a manifest.json, the docker save format every version
+          # reads, pointing at the same blobs.
+          blob() { printf '%s/blobs/%s' "$LAYOUT" "${1/://}"; }
+          manifest=$(blob "$(jq -r '.manifests[0].digest' "$LAYOUT/index.json")")
+          for _ in 1 2 3; do
+            jq -e '.manifests' "$manifest" >/dev/null || break
+            manifest=$(blob "$(jq -r '.manifests[0].digest' "$manifest")")
+          done
+          archive=$(mktemp -d)
+          jq --arg ref "$IMAGE_REF" '[{
+              Config: ("blobs/" + (.config.digest | sub(":"; "/"))),
+              RepoTags: [$ref],
+              Layers: [.layers[].digest | "blobs/" + sub(":"; "/")]
+            }]' "$manifest" > "${archive}/manifest.json"
+          tar -cf - -C "$LAYOUT" oci-layout index.json blobs -C "$archive" manifest.json | docker load
+          ref=$IMAGE_REF
+          if [ -n "$SMOKE_CMD" ]; then
+            echo "Smoke test: sh -c '${SMOKE_CMD}' in the image"
+            run=(--entrypoint sh "$ref" -c "$SMOKE_CMD")
+          else
+            echo "Smoke test: the image's entrypoint with --help (set smoke_cmd to make it a gate)"
+            run=("$ref" --help)
+          fi
+          name="smoke-${GITHUB_RUN_ID}-${GITHUB_JOB}-${RANDOM}"
+          rc=0
+          timeout --kill-after=10 120 docker run --rm --name "$name" --network none "${run[@]}" || rc=$?
+          docker rm -f "$name" >/dev/null 2>&1 || true
+          if [ "$rc" = 0 ]; then
+            echo "Smoke test passed"
+            exit 0
+          fi
+          why="exited ${rc}"
+          if [ "$rc" = 124 ] || [ "$rc" = 137 ]; then why="was still running after 120 seconds"; fi
+          if [ -n "$SMOKE_CMD" ]; then
+            echo "::error title=Smoke test::The image failed its smoke test (smoke_cmd ${why}); see this step's log."
+            exit 1
+          fi
+          echo "::warning title=Smoke test::The image's entrypoint with --help ${why}. Not a failure: set smoke_cmd to a command that exits 0 when the image works, or to none (${DOCS})."
 
       - name: Export digest
         if: needs.lint.outputs.push == 'true'
