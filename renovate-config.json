@@ -3,7 +3,8 @@
   "description": [
     "Merging: platformAutomerge, so the forge (GitHub auto-merge, GitLab merge when pipeline succeeds) merges an automerge PR the moment its required checks pass, any day, instead of waiting for Renovate's next visit. That is only safe where the branch rules require the real CI checks: every public GitHub repository's ruleset requires its CI jobs and the PR title check, and every GitLab project requires a green pipeline. A repository without that (a private one on GitHub Free, which gets no rulesets) or one with a merge window (platformAutomerge ignores automergeSchedule: the forge merges whenever the checks pass) sets platformAutomerge false.",
     "rebaseWhen conflicted: auto rebased every automerge PR that fell behind the default branch, and each rebase cost a CI run. The rulesets do not require a branch to be up to date and the merges are squash or merge commits, so a branch behind main still merges.",
-    "prHourlyLimit 0 with prConcurrentLimit and branchConcurrentLimit 20: Renovate's default of 2 PRs an hour parked updates under Rate-Limited, or pushed them as PR-less branches, while the queue was half empty; the concurrent limits already bound open PRs."
+    "prHourlyLimit 0 with prConcurrentLimit and branchConcurrentLimit 20: Renovate's default of 2 PRs an hour parked updates under Rate-Limited, or pushed them as PR-less branches, while the queue was half empty; the concurrent limits already bound open PRs.",
+    "Weekly groups open on Saturday or Sunday (UTC), so they merge before the Monday 06:00 UTC auto-release run that releases them. They used to open on Monday or Tuesday, after that run, so every batch waited 7 to 9 days for its release. Two days rather than one morning: the hosted GitHub app visits a quiet repository irregularly and missed a 9-hour Monday window for weeks (mail2apprise, 2026-11). The monthly manual lock file refresh keeps its own days."
   ],
   "extends": [
     "config:recommended",
@@ -78,12 +79,12 @@
     }
   },
   "lockFileMaintenance": {
-    "description": "Weekly refresh of every lock file to the newest versions the ranges allow, transitive ones included. Renovate posts no stability check for it, but hands minimumReleaseAge to two package managers: npm install --before=<now minus 7 days> and Poetry's POETRY_SOLVER_MIN_RELEASE_AGE, so npm and Poetry lock files take only releases at least 7 days old. uv.lock honours [tool.uv] exclude-newer (the uv consumers set 7 days). Those automerge (the lock file rule below); every other lock file takes whatever is newest: composer's refresh is off (php-ci audits the lock instead), and cargo, bundler and the rest wait for a person (the manual lock file rule at the end, which also makes them monthly). timestamp-optional because the update has no release timestamp, so with the default the branch would stay pending.",
+    "description": "Weekly refresh (Saturday or Sunday, like the weekly groups) of every lock file to the newest versions the ranges allow, transitive ones included. Renovate posts no stability check for it, but hands minimumReleaseAge to two package managers: npm install --before=<now minus 7 days> and Poetry's POETRY_SOLVER_MIN_RELEASE_AGE, so npm and Poetry lock files take only releases at least 7 days old. uv.lock honours [tool.uv] exclude-newer (the uv consumers set 7 days). Those automerge (the lock file rule below); every other lock file takes whatever is newest: composer's refresh is off (php-ci audits the lock instead), and cargo, bundler and the rest wait for a person (the manual lock file rule at the end, which also makes them monthly). timestamp-optional because the update has no release timestamp, so with the default the branch would stay pending.",
     "enabled": true,
     "commitMessageAction": "maintain",
     "commitMessageTopic": "lock files",
     "schedule": [
-      "* * * * 1,2"
+      "* * * * 0,6"
     ],
     "minimumReleaseAge": "7 days",
     "minimumReleaseAgeBehaviour": "timestamp-optional"
@@ -528,7 +529,7 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run, so no stability window; automerge on green CI, no reviewer. 1-minute floor (not 0 days) ensures Renovate posts a stability check on every branch. timestamp-optional because github-digest SHAs carry no releaseTimestamp. commitMessageExtra includes newDigestShort so each PR title is unique (without it Renovate disables automerge on later PRs with the same title). MUST be placed after the github-actions digest rule so its commitMessageExtra wins. Weekly (Monday or Tuesday), and updateNotScheduled false: .github gets commits most days, and Renovate otherwise rebased every consumer's open pin PR after each of them, which was half of all builds on Renovate branches; now the branch moves only on the schedule days. An urgent workflow fix needs a manual merge in the repos that need it.",
+      "description": "mbologna/.github reusable workflows: already age-gated by that repo's own Renovate run, so no stability window; automerge on green CI, no reviewer. 1-minute floor (not 0 days) ensures Renovate posts a stability check on every branch. timestamp-optional because github-digest SHAs carry no releaseTimestamp. commitMessageExtra includes newDigestShort so each PR title is unique (without it Renovate disables automerge on later PRs with the same title). MUST be placed after the github-actions digest rule so its commitMessageExtra wins. Weekly (Saturday or Sunday), and updateNotScheduled false: .github gets commits most days, and Renovate otherwise rebased every consumer's open pin PR after each of them, which was half of all builds on Renovate branches; now the branch moves only on the schedule days. An urgent workflow fix needs a manual merge in the repos that need it.",
       "matchManagers": [
         "github-actions"
       ],
@@ -538,7 +539,7 @@
       "minimumReleaseAge": "1 minute",
       "minimumReleaseAgeBehaviour": "timestamp-optional",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ],
       "automerge": true,
       "reviewers": [],
@@ -562,7 +563,7 @@
       "minimumReleaseAge": "7 days"
     },
     {
-      "description": "One weekly PR per repository for all GitHub Actions updates (majors still separate), opened on Monday or Tuesday and merged once CI passes: patch, minor and digest updates of every publisher automerge after their age gate (patch 7 days, minor 14, digest 7), because every action is SHA-pinned and the gate gives others time to notice a hijacked release. Majors are decided at the end (trusted publishers' majors automerge after 30 days; every other publisher's wait for a person). Not mbologna/.github's own reusable workflows, which have their own weekly rule, and not the runtime version inputs (setup-python's python-version and friends), which join their language's group.",
+      "description": "One weekly PR per repository for all GitHub Actions updates (majors still separate), opened on Saturday or Sunday and merged once CI passes: patch, minor and digest updates of every publisher automerge after their age gate (patch 7 days, minor 14, digest 7), because every action is SHA-pinned and the gate gives others time to notice a hijacked release. Majors are decided at the end (trusted publishers' majors automerge after 30 days; every other publisher's wait for a person). Not mbologna/.github's own reusable workflows, which have their own weekly rule, and not the runtime version inputs (setup-python's python-version and friends), which join their language's group.",
       "matchManagers": [
         "github-actions"
       ],
@@ -572,7 +573,7 @@
       ],
       "groupName": "github-actions",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ]
     },
     {
@@ -952,7 +953,7 @@
       "extractVersion": "^kustomize/v(?<version>.+)$"
     },
     {
-      "description": "Non-major PyPI and npm updates: one PR a week per repository, opened on Monday or Tuesday. Each was its own PR and its own CI run (on GitLab, on the self-hosted runner, two jobs at a time). Placed before the preset's other groups, so the uv, python, dev tooling and Docker base images groups still win for their members. Majors keep their own PR; security fixes are separate branches and never grouped.",
+      "description": "Non-major PyPI and npm updates: one PR a week per repository, opened on Saturday or Sunday. Each was its own PR and its own CI run (on GitLab, on the self-hosted runner, two jobs at a time). Placed before the preset's other groups, so the uv, python, dev tooling and Docker base images groups still win for their members. Majors keep their own PR; security fixes are separate branches and never grouped.",
       "matchDatasources": [
         "pypi",
         "npm"
@@ -963,7 +964,7 @@
       ],
       "groupName": "non-major dependencies",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ]
     },
     {
@@ -1009,7 +1010,7 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "uv: one PR per uv release for every place a repository pins it: uv from PyPI in requirements-uv.txt (hash-pinned, installed with pip in a Dockerfile's build stage), the uv image where a Dockerfile still copies it (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. One PR a week, opened on Monday or Tuesday: the PyPI members would get that schedule from the non-major dependencies group anyway, and the setup-uv input from the github-actions group, so the whole group shares it. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. Dockerfiles take uv from PyPI because PyPI gives the release date the digest-pinned ghcr.io image lacks: that image's updates could not be age-gated and waited for a person in every repository (the date-less digest-pinned rule), while the PyPI uv waits out the usual age gate and automerges; the pip_requirements manager refreshes the hashes. After the ghcr.io override rules, which must not lose the image's lookup.",
+      "description": "uv: one PR per uv release for every place a repository pins it: uv from PyPI in requirements-uv.txt (hash-pinned, installed with pip in a Dockerfile's build stage), the uv image where a Dockerfile still copies it (ghcr.io/astral-sh/uv, looked up on GitHub releases as astral-sh/uv), the uv_build backend in pyproject.toml and the setup-uv version input. One PR a week, opened on Saturday or Sunday: the PyPI members would get that schedule from the non-major dependencies group anyway, and the setup-uv input from the github-actions group, so the whole group shares it. They are the same release, and separate PRs left a repository's image and build backend on different uv versions between merges. Dockerfiles take uv from PyPI because PyPI gives the release date the digest-pinned ghcr.io image lacks: that image's updates could not be age-gated and waited for a person in every repository (the date-less digest-pinned rule), while the PyPI uv waits out the usual age gate and automerges; the pip_requirements manager refreshes the hashes. After the ghcr.io override rules, which must not lose the image's lookup.",
       "matchDepNames": [
         "uv",
         "ghcr.io/astral-sh/uv",
@@ -1018,7 +1019,7 @@
       ],
       "groupName": "uv",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ]
     },
     {
@@ -1037,7 +1038,7 @@
       "groupName": "Docker base images"
     },
     {
-      "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened on Monday or Tuesday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR. Monday or Tuesday rather than Monday morning: the hosted GitHub app visits a quiet repository irregularly and missed a 9-hour Monday window for weeks (mail2apprise, 2026-11).",
+      "description": "Dev tooling (npm devDependencies, composer require-dev: linters, formatters, test and release tools): one PR a week per repository, opened on Saturday or Sunday. They ship nothing to users and were about 27 separate PRs in two months. Patch and minor only: a major keeps its own PR.",
       "matchManagers": [
         "npm",
         "composer"
@@ -1052,11 +1053,11 @@
       ],
       "groupName": "dev tooling",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ]
     },
     {
-      "description": "Terraform providers: one PR a week per repository, opened on Monday or Tuesday. A merge deploys nothing (tofu apply is a separate step), and each provider had its own PR. Patch and minor only: a major keeps its own PR, where the repository asks for a plan before merging.",
+      "description": "Terraform providers: one PR a week per repository, opened on Saturday or Sunday. A merge deploys nothing (tofu apply is a separate step), and each provider had its own PR. Patch and minor only: a major keeps its own PR, where the repository asks for a plan before merging.",
       "matchManagers": [
         "terraform"
       ],
@@ -1066,11 +1067,11 @@
       ],
       "groupName": "Terraform providers",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ]
     },
     {
-      "description": "pre-commit hook version bumps: one PR a week per repository, opened on Monday or Tuesday, like the other tooling groups. They only change local and CI checks. Digest updates keep their own manual rule (a moved tag).",
+      "description": "pre-commit hook version bumps: one PR a week per repository, opened on Saturday or Sunday, like the other tooling groups. They only change local and CI checks. Digest updates keep their own manual rule (a moved tag).",
       "matchManagers": [
         "pre-commit"
       ],
@@ -1080,11 +1081,11 @@
       ],
       "groupName": "pre-commit hooks",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ]
     },
     {
-      "description": "Helm chart patch and minor updates: one PR a week per repository, opened on Monday or Tuesday, instead of a chain of PRs as a chart moves 10.9.7, 10.10.3, 10.10.5 in a week. A repository whose image scanner expedites single chart PRs sets groupName null for helm and keeps the weekly schedule.",
+      "description": "Helm chart patch and minor updates: one PR a week per repository, opened on Saturday or Sunday, instead of a chain of PRs as a chart moves 10.9.7, 10.10.3, 10.10.5 in a week. A repository whose image scanner expedites single chart PRs sets groupName null for helm and keeps the weekly schedule.",
       "matchDatasources": [
         "helm"
       ],
@@ -1094,7 +1095,7 @@
       ],
       "groupName": "Helm charts",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ]
     },
     {
@@ -1122,7 +1123,7 @@
       "minimumReleaseAge": "1 minute",
       "minimumReleaseAgeBehaviour": "timestamp-optional",
       "schedule": [
-        "* * * * 1,2"
+        "* * * * 0,6"
       ],
       "automerge": true,
       "reviewers": [],

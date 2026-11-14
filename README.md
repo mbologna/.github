@@ -144,6 +144,24 @@ image whose tag comes from linuxserver's releases, a datasource that can't
 look up digests, are pinned by tag (linuxserver never re-pushes an `-lsN`
 tag).
 
+## Renovate preset
+
+Each rule in [`renovate-config.json`](renovate-config.json) carries a
+`description` with its reasoning; this section is the overview.
+
+### Schedules
+
+| What | When (UTC) |
+|---|---|
+| Weekly groups and lock file maintenance | Saturday or Sunday (`* * * * 0,6`), so a batch merges before the Monday 06:00 release run that ships it |
+| Security fixes (`vulnerabilityAlerts`) | At any time, with no age gate |
+| Lock file refresh for package managers without an age gate (cargo, bundler, ...) | Days 1-3 of each month, for a person to merge |
+| Everything else | At any time, once its age gate passes |
+
+Automerge has no schedule (`automergeSchedule: at any time`): the forge
+merges a PR as soon as its required checks pass. A repository with a merge
+window sets its own `automergeSchedule` and `platformAutomerge: false`.
+
 ## Reusable workflows
 
 Check names (`<caller job> / <job name>`) are what the repositories' rulesets
