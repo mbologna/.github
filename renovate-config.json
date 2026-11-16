@@ -489,6 +489,12 @@
       "pinDigests": false
     },
     {
+      "description": "A uv/PEP 621 git source (apprise-notify = { git = ..., tag = \"v1.2.0\" } in pyproject.toml) is looked up as a git tag; pinning it to a commit SHA cannot be written (\"Error updating branch: update failure\" on Pin dependency apprise-notify in a private repository, 2026-11-16).",
+      "matchManagers": ["pep621"],
+      "matchDatasources": ["git-tags", "github-tags", "gitlab-tags"],
+      "pinDigests": false
+    },
+    {
       "description": "GitLab CI includes and components (the mbologna/ci-templates include): ci/ prefix and both versions, like the other managers' titles.",
       "matchManagers": [
         "gitlabci-include"
