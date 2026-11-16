@@ -207,7 +207,7 @@
   ],
   "packageRules": [
     {
-      "description": "Major updates: hold 30 days to let the ecosystem surface breaking changes and incompatibilities. Whether they merge themselves is decided at the end: the low-risk majors rule automerges a few kinds, the manual major rule holds every other one for a person.",
+      "description": "Major updates: hold 30 days to let the ecosystem surface breaking changes and incompatibilities. Whether they merge themselves is decided at the end: the majors rule automerges them, then the shared denylist and the Terraform provider rule hold the risky ones for a person.",
       "matchUpdateTypes": [
         "major"
       ],
@@ -1110,12 +1110,9 @@
       ]
     },
     {
-      "description": "Low-risk majors automerge after the 30-day hold, on green CI: the trusted publishers' GitHub Actions (actions/*, github/*, docker/*, astral-sh/*, google-github-actions/*, sigstore/*, peaceiris/*; their majors are almost always a new Node runtime for the action), GitHub-hosted runner images (ubuntu-24.04 to 26.04) and my own packages (anything under mbologna/, whose majors I wrote). Runtime version inputs (depType uses-with) are excluded: they are language versions. Must come right before the manual major rule, which excludes the same set. groupName null: each major gets its own PR, never a group's major branch (the GitHub Actions group used to bundle the trusted publishers' majors); a repository's lock-step group comes later and still keeps its majors together.",
+      "description": "Majors automerge after the 30-day hold, on green CI, in every repository (decided 2026-11-16, as mbologna/infra since 2026-11-14): CI runs the new major before the merge, and the 30 days let the ecosystem report breakage first. The denylist rule right after holds the majors that migrate data or change how a system networks, stores, authenticates, decrypts, backs up or upgrades. groupName null: each major gets its own PR, never a group's major branch; a repository's lock-step group comes later and still keeps its majors together.",
       "matchUpdateTypes": [
         "major"
-      ],
-      "matchJsonata": [
-        "$contains($string(packageName), 'mbologna/') or datasource = 'github-runners' or (manager = 'github-actions' and depType != 'uses-with' and $contains($string(packageName), /^(actions|github|docker|astral-sh|google-github-actions|sigstore|peaceiris)\\//))"
       ],
       "automerge": true,
       "labels": [
@@ -1125,15 +1122,64 @@
       "groupName": null
     },
     {
-      "description": "Every other major waits for a person after its 30-day hold, except in mbologna/infra, which since 2026-11-14 automerges third-party majors after the hold and keeps its own denylist of majors that wait (its renovate.json). The manual rules come last and nothing after them turns automerge back on, so the label and the PR note always agree with what happens (prBodyNotes and addLabels are appended across matching rules and cannot be taken back by a later one). groupName null: a manual major gets its own PR, so it can never share a branch with updates that automerge (a group automerges only when every member may, and carries the union of their labels, which is how ci-templates MRs once showed both automerge and manual-review). Repository rules come later, so a lock-step group in a repository keeps its majors together.",
+      "description": "Majors that wait for a person (the shared denylist, 2026-11-16): databases, cluster plumbing (storage, networking, ingress, GitOps, certificates, secrets, upgrades), infrastructure-as-code and backup and auth tools, whose majors migrate state or change how a system networks, stores, authenticates, decrypts, backs up or upgrades. My own packages are excluded (their repository reviewed the major). mbologna/infra keeps its own, larger denylist (its renovate.json), so this rule skips it: prBodyNotes are appended across rules and a later automerge rule could not take the note back. The manual rules come last and nothing after them turns automerge back on, so the label and the PR note agree with what happens. groupName null: a held major gets its own PR.",
       "matchUpdateTypes": [
         "major"
       ],
       "matchRepositories": [
         "!mbologna/infra"
       ],
-      "matchJsonata": [
-        "$not($contains($string(packageName), 'mbologna/') or datasource = 'github-runners' or (manager = 'github-actions' and depType != 'uses-with' and $contains($string(packageName), /^(actions|github|docker|astral-sh|google-github-actions|sigstore|peaceiris)\\//)))"
+      "matchPackageNames": [
+        "/postgres/",
+        "/mysql/",
+        "/mariadb/",
+        "/redis/",
+        "/valkey/",
+        "/mongo/",
+        "/elasticsearch/",
+        "/opensearch/",
+        "/clickhouse/",
+        "/longhorn/",
+        "/metallb/",
+        "/traefik/",
+        "/ingress-nginx/",
+        "/argo-?cd/",
+        "/argoproj/",
+        "/cert-manager/",
+        "/external-secrets/",
+        "/external-dns/",
+        "/tailscale/",
+        "/system-upgrade-controller/",
+        "/descheduler/",
+        "/kured/",
+        "/gateway-api/",
+        "/gateway-helm/",
+        "/envoyproxy/",
+        "/cilium/",
+        "/calico/",
+        "/flannel/",
+        "/coredns/",
+        "/k3s/",
+        "/rke2/",
+        "/rancher/",
+        "/cluster-api/",
+        "/fleet/",
+        "/kustomize-sops/",
+        "/getsops\\/sops/",
+        "/opentofu/",
+        "/hashicorp\\/terraform$/",
+        "/restic/",
+        "/rclone/",
+        "/borg/",
+        "/kopia/",
+        "/velero/",
+        "/keycloak/",
+        "/authelia/",
+        "/authentik/",
+        "/tinyauth/",
+        "/oauth2-proxy/",
+        "!**/mbologna/**",
+        "!mbologna/**"
       ],
       "automerge": false,
       "reviewers": [
@@ -1144,7 +1190,32 @@
         "manual-review"
       ],
       "prBodyNotes": [
-        "**Why this waits for you:** a major update, which may break things. It waited 30 days for others to report problems; read the release notes before merging."
+        "**Why this waits for you:** a major on the shared denylist (mbologna/.github renovate-config.json): its upgrades can migrate data or a database, or change networking, storage, auth, secrets, backups or upgrades. It waited 30 days; read the release notes and the migration guide before merging."
+      ],
+      "groupName": null
+    },
+    {
+      "description": "Terraform provider majors wait for a person, except where CI plans the change against the live deployment and fails on any planned change (mbologna/infra, mbologna/k3s-oci): elsewhere only tofu validate runs, which says nothing about what the provider would do to real resources.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchDatasources": [
+        "terraform-provider"
+      ],
+      "matchRepositories": [
+        "!mbologna/infra",
+        "!mbologna/k3s-oci"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "mbologna"
+      ],
+      "labels": [
+        "dependencies",
+        "manual-review"
+      ],
+      "prBodyNotes": [
+        "**Why this waits for you:** a Terraform provider major in a repository whose CI does not plan against real resources. Plan it before merging; it should show no changes."
       ],
       "groupName": null
     },
