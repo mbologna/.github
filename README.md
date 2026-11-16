@@ -171,7 +171,7 @@ lowest first:
 | 2 | **Maintenance**: patch, minor and digest updates, Saturday or Sunday, automerge | One branch for row 1's updates and every other non-major one |
 | 3 | `hugo`, `python` | Every pin of Hugo, or of the language version (base image tag, CI input, setup action input), in one PR as soon as its age gate passes: a new version gets its own CI run and a failure doesn't hold the week's batch. A repository can add its own pins to these groups (a Hugo site adds Dart Sass) |
 | 4 | Docker base images | Third-party base-image digests in one PR per rebuild wave, unscheduled: the merge is what lets auto-release ship a CVE fix |
-| 5 | Majors | One PR each (`groupName: null`), automerged after 30 days for the low-risk kinds, a person for the rest |
+| 5 | Majors | One PR each (`groupName: null`), automerged after 30 days on green CI, except a shared denylist (databases, cluster plumbing, infrastructure-as-code, backup and auth tools) and Terraform provider majors outside the repositories whose CI plans against live resources, which wait for a person |
 | 6 | Manual rules (digest-pinned ghcr version bumps, branch commits) | One PR each, for a person |
 | last | Security fixes (`vulnerabilityAlerts`) | One PR each, at any time; Renovate applies this block after every rule |
 
