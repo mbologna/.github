@@ -1230,16 +1230,17 @@
       "enabled": false
     },
     {
-      "description": "Date-less registries, digest-pinned: ghcr.io tag@sha256 pins stay on the docker datasource (parts 1-5 skip them), which resolves real image digests but gives no release dates. A version bump therefore cannot be age-gated: it opens a PR for a person to review instead of sitting in Pending Status Checks unseen. Same-tag digest updates keep the digest rules. groupName null: a version bump that waits for a person gets its own PR, so it never joins the maintenance group.",
+      "description": "Date-less registries, digest-pinned: ghcr.io tag@sha256 pins stay on the docker datasource (parts 1-5 skip them), which resolves real image digests but gives no release dates. mcr.microsoft.com images are here digest-pinned or not: MCR gives no dates either, and no dated source carries its tags (the .NET SDK and runtime images held every patch in Pending Status Checks, 2026-11). A version bump therefore cannot be age-gated: it opens a PR for a person to review instead of sitting in Pending Status Checks unseen. Same-tag digest updates keep the digest rules. groupName null: a version bump that waits for a person gets its own PR, so it never joins the maintenance group.",
       "matchDatasources": [
         "docker"
       ],
       "matchPackageNames": [
         "/^ghcr\\.io/[^/]+/[^/]+$/",
+        "/^mcr\\.microsoft\\.com//",
         "!ghcr.io/mbologna/**"
       ],
       "matchJsonata": [
-        "$exists(currentDigest)"
+        "$exists(currentDigest) or $contains($string(packageName), /^mcr\\.microsoft\\.com\\//)"
       ],
       "matchUpdateTypes": [
         "major",
