@@ -205,8 +205,9 @@ datasource, `github-tags` for an image built from tagged sources, or
 `renovate-held-scan.yml` looks for these every Sunday. It runs a Renovate
 lookup dry run over every non-archived repository, on GitHub, GitLab and
 Codeberg, and keeps one issue here,
-"Renovate updates held by the age gate", up to date. The issue closes once
-nothing is held. Two kinds of update count as held: a release with no date,
+"Renovate updates held by the age gate", up to date: it comments when the
+findings change, because an edited description notifies nobody, and closes
+once nothing is held. Two kinds of update count as held: a release with no date,
 and a dated update still pending after 95 days, longer than any gate. Without
 the optional `RENOVATE_SCAN_TOKEN` secret, the scan reads only the public
 repositories. The secret is a fine-grained token with read-only Contents and
