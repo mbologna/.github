@@ -38,9 +38,11 @@ def scan(lines, now):
         repo = rec.get("repository")
         if not repo:
             continue
-        repos.add(repo)
         msg = rec.get("msg", "")
-        if DATELESS in msg:
+        # Other records carry a repository field too: a datasource's source repository.
+        if msg == "Repository started":
+            repos.add(repo)
+        elif DATELESS in msg:
             dateless[repo].update(u.get("depName") or "an unnamed dependency" for u in rec.get("updates", []))
         elif msg == "packageFiles with updates":
             for files in rec.get("config", {}).values():
