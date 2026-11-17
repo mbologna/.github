@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Report the Renovate updates that minimumReleaseAge holds for good.
 
-Reads a Renovate run log (LOG_LEVEL=debug, LOG_FORMAT=json) on stdin and
-prints a Markdown report. The first line of the report is the number of
+Reads Renovate run logs (LOG_LEVEL=debug, LOG_FORMAT=json) and prints a
+Markdown report. Each argument is a log file, as PATH or PREFIX=PATH; a
+prefix names that log's repositories PREFIX/<repo>, which keeps a GitLab
+project apart from a GitHub repository of the same name. With no arguments
+the log is read from stdin. The first line of the report is the number of
 findings. Two kinds of findings:
 
 - Releases with no release date. Under the default
@@ -27,9 +30,12 @@ PRIVATE = set(os.environ.get("PRIVATE", "").split())
 DATELESS = "do not have a releaseTimestamp and we're running with minimumReleaseAgeBehaviour=timestamp-required"
 
 
-def scan(lines, now):
-    """Return (repositories seen, dateless {repo: {dep}}, overdue {repo: {(dep, current, new, days)}})."""
-    repos, dateless, overdue = set(), defaultdict(set), defaultdict(set)
+def scan(lines, now, prefix="", found=None):
+    """Return (repositories seen, dateless {repo: {dep}}, overdue {repo: {(dep, current, new, days)}}).
+
+    Adds to found, a result of an earlier call, when given.
+    """
+    repos, dateless, overdue = found or (set(), defaultdict(set), defaultdict(set))
     for line in lines:
         try:
             rec = json.loads(line)
@@ -38,6 +44,8 @@ def scan(lines, now):
         repo = rec.get("repository")
         if not repo:
             continue
+        if prefix:
+            repo = f"{prefix}/{repo}"
         msg = rec.get("msg", "")
         # Other records carry a repository field too: a datasource's source repository.
         if msg == "Repository started":
@@ -87,5 +95,17 @@ def report(repos, dateless, overdue):
     return "\n".join(head + lines) + "\n"
 
 
+def main(args):
+    now = dt.datetime.now(dt.UTC)
+    if not args:
+        return report(*scan(sys.stdin, now))
+    found = None
+    for arg in args:
+        prefix, _, path = arg.rpartition("=")
+        with open(path, encoding="utf-8") as log:
+            found = scan(log, now, prefix, found)
+    return report(*found)
+
+
 if __name__ == "__main__":
-    print(report(*scan(sys.stdin, dt.datetime.now(dt.UTC))), end="")
+    print(main(sys.argv[1:]), end="")
