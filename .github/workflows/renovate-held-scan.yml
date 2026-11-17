@@ -1,0 +1,109 @@
+name: Renovate held updates
+
+# Finds the updates that minimumReleaseAge holds for good, across every repo in
+# this account. The preset's age gates run with the default
+# minimumReleaseAgeBehaviour=timestamp-required, so a release with no release
+# date never leaves the gate. Renovate mentions it only in a debug line. When
+# the update shares a branch with dated ones, the Dependency Dashboard misses
+# it too: Pending Status Checks lists a branch only when everything in it is
+# pending. In November 2026 golang (image-cve-alert), the AWS cloud
+# controller manager (rancher-fleet-clusters) and Temurin (dotfiles) had sat
+# there for weeks.
+#
+# A Renovate lookup dry run (no branches, PRs or dashboard edits) over every
+# non-archived repo; scripts/renovate-held-report.py turns its debug log into
+# one issue here, updated weekly and closed once nothing is held. The log
+# itself is never printed or uploaded: this repo is public.
+#
+# RENOVATE_SCAN_TOKEN (optional): a fine-grained token with read-only Contents
+# and Metadata on all repositories. Without it the workflow's own token reads
+# the public repos only. Private repos are listed in the issue with a count,
+# not their dependencies.
+
+on:
+  schedule:
+    # Sundays 05:00 UTC, so the issue is fresh for the week.
+    - cron: "0 5 * * 0"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/renovate-held-scan.yml
+      - scripts/renovate-held-report.py
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: renovate-held-scan
+  cancel-in-progress: true
+
+env:
+  TITLE: Renovate updates held by the age gate
+
+jobs:
+  scan:
+    name: Scan for held updates
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # Node 26 for the same reason as in renovate-config-validate.yml: npx
+      # skips Renovate releases whose engines exclude an older Node.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "26"
+
+      - name: Renovate lookup across the repos
+        env:
+          SCAN_TOKEN: ${{ secrets.RENOVATE_SCAN_TOKEN || github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          export GH_TOKEN="$SCAN_TOKEN" RENOVATE_TOKEN="$SCAN_TOKEN" GITHUB_COM_TOKEN="$SCAN_TOKEN"
+          gh repo list "$OWNER" --no-archived --limit 500 --json nameWithOwner,visibility >repos.json
+          mapfile -t repos < <(jq -r '.[].nameWithOwner' repos.json)
+          jq -r '.[] | select(.visibility != "PUBLIC") | .nameWithOwner' repos.json >private.txt
+          echo "Scanning ${#repos[@]} repositories ($(wc -l <private.txt) private)."
+          # --require-config skips repos without a Renovate config. A username
+          # and git author spare Renovate the user and app lookups, which the
+          # workflow token can't answer; a lookup run commits nothing.
+          LOG_LEVEL=debug LOG_FORMAT=json npx --yes --package renovate -- renovate \
+            --platform=github --dry-run=lookup --require-config=required \
+            --onboarding=false --username=renovate-held-scan \
+            --git-author="renovate-held-scan <noreply@github.com>" \
+            "${repos[@]}" >renovate.log 2>&1 \
+            || echo "::warning::Renovate exited non-zero; the report covers what it looked up."
+          jq -r 'select(.level >= 50) | "\(.repository // "-"): \(.msg)"' renovate.log 2>/dev/null \
+            | sort -u | sed 's/^/::warning::/' || true
+
+      - name: Report
+        id: report
+        run: |
+          set -euo pipefail
+          PRIVATE="$(cat private.txt)" python3 scripts/renovate-held-report.py <renovate.log >report.md
+          echo "count=$(head -1 report.md)" >>"$GITHUB_OUTPUT"
+          tail -n +2 report.md | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Open, update or close the issue
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          COUNT: ${{ steps.report.outputs.count }}
+        run: |
+          set -euo pipefail
+          number=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq "map(select(.title == env.TITLE)) | first | .number // empty")
+          tail -n +2 report.md >body.md
+          printf '\n[Scan run](%s/%s/actions/runs/%s)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >>body.md
+          if [ "$COUNT" -gt 0 ]; then
+            if [ -n "$number" ]; then
+              gh issue edit "$number" --body-file body.md
+            else
+              gh issue create --title "$TITLE" --body-file body.md
+            fi
+          elif [ -n "$number" ]; then
+            gh issue close "$number" --comment "Nothing is held any more."
+          fi
