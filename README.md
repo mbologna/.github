@@ -203,14 +203,18 @@ datasource, `github-tags` for an image built from tagged sources, or
 `custom.dockerhub-suffix` for a Docker Hub image with more than 1,000 tags.
 
 `renovate-held-scan.yml` looks for these every Sunday. It runs a Renovate
-lookup dry run over every non-archived repository and keeps one issue here,
+lookup dry run over every non-archived repository, on GitHub and on GitLab,
+and keeps one issue here,
 "Renovate updates held by the age gate", up to date. The issue closes once
 nothing is held. Two kinds of update count as held: a release with no date,
 and a dated update still pending after 95 days, longer than any gate. Without
 the optional `RENOVATE_SCAN_TOKEN` secret, the scan reads only the public
 repositories. The secret is a fine-grained token with read-only Contents and
-Metadata on all repositories. This repository is public, so the issue gives a
-private repository's held updates as a count.
+Metadata on all repositories. GitLab is scanned only when the
+`RENOVATE_SCAN_GITLAB_TOKEN` secret holds a GitLab personal access token with
+`read_api` and `read_repository`; the issue names those projects
+`gitlab.com/<path>`. This repository is public, so the issue gives a private
+repository's held updates as a count.
 
 ## Reusable workflows
 

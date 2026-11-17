@@ -11,14 +11,20 @@ name: Renovate held updates
 # there for weeks.
 #
 # A Renovate lookup dry run (no branches, PRs or dashboard edits) over every
-# non-archived repo; scripts/renovate-held-report.py turns its debug log into
-# one issue here, updated weekly and closed once nothing is held. The log
-# itself is never printed or uploaded: this repo is public.
+# non-archived repo, on GitHub and on GitLab; scripts/renovate-held-report.py
+# turns the debug logs into one issue here, updated weekly and closed once
+# nothing is held. The logs themselves are never printed or uploaded: this
+# repo is public.
 #
 # RENOVATE_SCAN_TOKEN (optional): a fine-grained token with read-only Contents
 # and Metadata on all repositories. Without it the workflow's own token reads
 # the public repos only. Private repos are listed in the issue with a count,
 # not their dependencies.
+#
+# RENOVATE_SCAN_GITLAB_TOKEN (optional): a GitLab personal access token with
+# read_api and read_repository. Without it GitLab is not scanned. The
+# projects are those of the GITLAB_NAMESPACE variable's user, or of the user
+# named like this repo's owner; the report names them gitlab.com/<path>.
 
 on:
   schedule:
@@ -55,7 +61,7 @@ jobs:
         with:
           node-version: "26"
 
-      - name: Renovate lookup across the repos
+      - name: Renovate lookup across the GitHub repos
         env:
           SCAN_TOKEN: ${{ secrets.RENOVATE_SCAN_TOKEN || github.token }}
           OWNER: ${{ github.repository_owner }}
@@ -65,7 +71,7 @@ jobs:
           gh repo list "$OWNER" --no-archived --limit 500 --json nameWithOwner,visibility >repos.json
           mapfile -t repos < <(jq -r '.[].nameWithOwner' repos.json)
           jq -r '.[] | select(.visibility != "PUBLIC") | .nameWithOwner' repos.json >private.txt
-          echo "Scanning ${#repos[@]} repositories ($(wc -l <private.txt) private)."
+          echo "Scanning ${#repos[@]} GitHub repositories ($(wc -l <private.txt) private)."
           # --require-config skips repos without a Renovate config. A username
           # and git author spare Renovate the user and app lookups, which the
           # workflow token can't answer; a lookup run commits nothing.
@@ -73,16 +79,47 @@ jobs:
             --platform=github --dry-run=lookup --require-config=required \
             --onboarding=false --username=renovate-held-scan \
             --git-author="renovate-held-scan <noreply@github.com>" \
-            "${repos[@]}" >renovate.log 2>&1 \
+            "${repos[@]}" >github.log 2>&1 \
             || echo "::warning::Renovate exited non-zero; the report covers what it looked up."
-          jq -r 'select(.level >= 50) | "\(.repository // "-"): \(.msg)"' renovate.log 2>/dev/null \
-            | sort -u | sed 's/^/::warning::/' || true
+          # fromjson? skips npm's lines, which aren't JSON.
+          jq -rR 'fromjson? | select(.level >= 50) | "\(.repository // "-"): \(.msg)"' github.log \
+            | sort -u | sed 's/^/::warning::/'
+
+      - name: Renovate lookup across the GitLab projects
+        env:
+          GITLAB_TOKEN: ${{ secrets.RENOVATE_SCAN_GITLAB_TOKEN }}
+          GITHUB_COM_TOKEN: ${{ secrets.RENOVATE_SCAN_TOKEN || github.token }}
+          GITLAB_OWNER: ${{ vars.GITLAB_NAMESPACE || github.repository_owner }}
+        run: |
+          set -euo pipefail
+          : >gitlab.log
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "::notice::RENOVATE_SCAN_GITLAB_TOKEN is not set: GitLab is not scanned."
+            exit 0
+          fi
+          # Projects pending deletion keep their pipelines but no longer matter.
+          curl -fsS --header "PRIVATE-TOKEN: $GITLAB_TOKEN" \
+            "https://gitlab.com/api/v4/users/$GITLAB_OWNER/projects?archived=false&per_page=100" \
+            | jq '[.[] | select((.marked_for_deletion_on // .marked_for_deletion_at) == null)]' >gitlab.json
+          mapfile -t repos < <(jq -r '.[].path_with_namespace' gitlab.json)
+          jq -r '.[] | select(.visibility != "public") | "gitlab.com/" + .path_with_namespace' gitlab.json >gitlab-private.txt
+          cat gitlab-private.txt >>private.txt
+          echo "Scanning ${#repos[@]} GitLab projects ($(wc -l <gitlab-private.txt) private)."
+          # GITHUB_COM_TOKEN fetches the preset and GitHub-hosted releases.
+          RENOVATE_TOKEN="$GITLAB_TOKEN" LOG_LEVEL=debug LOG_FORMAT=json npx --yes --package renovate -- renovate \
+            --platform=gitlab --endpoint=https://gitlab.com/api/v4/ --dry-run=lookup \
+            --require-config=required --onboarding=false \
+            --git-author="renovate-held-scan <noreply@github.com>" \
+            "${repos[@]}" >gitlab.log 2>&1 \
+            || echo "::warning::Renovate exited non-zero on GitLab; the report covers what it looked up."
+          jq -rR 'fromjson? | select(.level >= 50) | "gitlab.com/\(.repository // "-"): \(.msg)"' gitlab.log \
+            | sort -u | sed 's/^/::warning::/'
 
       - name: Report
         id: report
         run: |
           set -euo pipefail
-          PRIVATE="$(cat private.txt)" python3 scripts/renovate-held-report.py <renovate.log >report.md
+          PRIVATE="$(cat private.txt)" python3 scripts/renovate-held-report.py github.log gitlab.com=gitlab.log >report.md
           echo "count=$(head -1 report.md)" >>"$GITHUB_OUTPUT"
           tail -n +2 report.md | tee -a "$GITHUB_STEP_SUMMARY"
 
