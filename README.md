@@ -210,12 +210,16 @@ findings change, because an edited description notifies nobody, and closes
 once nothing is held. Two kinds of update count as held: a release with no date,
 and a dated update still pending after 95 days, longer than any gate. Without
 the optional `RENOVATE_SCAN_TOKEN` secret, the scan reads only the public
-repositories. The secret is a fine-grained token with read-only Contents and
-Metadata on all repositories. GitLab is scanned only when the
+repositories. The secret is a fine-grained token with read-only Contents,
+Issues and Metadata on all repositories (Renovate reads a repository's
+issues), and a lifetime of at most 366 days: the SUSE enterprise refuses
+longer-lived tokens, which breaks the lookup of every fork of a SUSE-owned
+repository. GitLab is scanned only when the
 `RENOVATE_SCAN_GITLAB_TOKEN` secret holds a GitLab personal access token with
 `read_api` and `read_repository`, and Codeberg only when
 `RENOVATE_SCAN_CODEBERG_TOKEN` holds a Codeberg access token with
-`read:repository`, `read:issue` and `read:user`. The issue names those
+`read:organization`, `read:repository`, `read:issue` and `read:user`
+(Renovate asks whether the owner is an organization). The issue names those
 repositories `gitlab.com/<path>` and `codeberg.org/<path>`. This repository
 is public, so the issue gives a private repository's held updates as a count.
 
