@@ -52,6 +52,17 @@ concurrency:
 
 env:
   TITLE: Renovate updates held by the age gate
+  # Renovate's errors as warnings, with the first line of the cause. Run
+  # logs are public: a repository listed in private.txt goes unnamed.
+  # fromjson? skips npm's lines, which aren't JSON.
+  WARNINGS: >-
+    ($priv | split("\n")) as $hidden
+    | fromjson? | select(.level >= 50)
+    | ($prefix + (.repository // "-")) as $repo
+    | "::warning::"
+    + (if $hidden | index([$repo]) then "a private repository" else $repo end)
+    + ": \(.msg)"
+    + (if .err.message then " (\(.err.message | split("\n")[0] | .[0:200]))" else "" end)
 
 jobs:
   scan:
@@ -87,9 +98,7 @@ jobs:
             --git-author="renovate-held-scan <noreply@github.com>" \
             "${repos[@]}" >github.log 2>&1 \
             || echo "::warning::Renovate exited non-zero; the report covers what it looked up."
-          # fromjson? skips npm's lines, which aren't JSON.
-          jq -rR 'fromjson? | select(.level >= 50) | "\(.repository // "-"): \(.msg)"' github.log \
-            | sort -u | sed 's/^/::warning::/'
+          jq -rR --arg prefix "" --rawfile priv private.txt "$WARNINGS" github.log | sort -u
 
       - name: Renovate lookup across the GitLab projects
         env:
@@ -118,8 +127,7 @@ jobs:
             --git-author="renovate-held-scan <noreply@github.com>" \
             "${repos[@]}" >gitlab.log 2>&1 \
             || echo "::warning::Renovate exited non-zero on GitLab; the report covers what it looked up."
-          jq -rR 'fromjson? | select(.level >= 50) | "gitlab.com/\(.repository // "-"): \(.msg)"' gitlab.log \
-            | sort -u | sed 's/^/::warning::/'
+          jq -rR --arg prefix gitlab.com/ --rawfile priv private.txt "$WARNINGS" gitlab.log | sort -u
 
       - name: Renovate lookup across the Codeberg repos
         env:
@@ -147,8 +155,7 @@ jobs:
             --git-author="renovate-held-scan <noreply@github.com>" \
             "${repos[@]}" >codeberg.log 2>&1 \
             || echo "::warning::Renovate exited non-zero on Codeberg; the report covers what it looked up."
-          jq -rR 'fromjson? | select(.level >= 50) | "codeberg.org/\(.repository // "-"): \(.msg)"' codeberg.log \
-            | sort -u | sed 's/^/::warning::/'
+          jq -rR --arg prefix codeberg.org/ --rawfile priv private.txt "$WARNINGS" codeberg.log | sort -u
 
       - name: Report
         id: report
