@@ -202,26 +202,10 @@ doesn't show it either. Give such a package a dated lookup: a `custom.*`
 datasource, `github-tags` for an image built from tagged sources, or
 `custom.dockerhub-suffix` for a Docker Hub image with more than 1,000 tags.
 
-`renovate-held-scan.yml` looks for these every Sunday. It runs a Renovate
-lookup dry run over every non-archived repository, on GitHub, GitLab and
-Codeberg, and keeps one issue here,
-"Renovate updates held by the age gate", up to date: it comments when the
-findings change, because an edited description notifies nobody, and closes
-once nothing is held. Two kinds of update count as held: a release with no date,
-and a dated update still pending after 95 days, longer than any gate. Without
-the optional `RENOVATE_SCAN_TOKEN` secret, the scan reads only the public
-repositories. The secret is a fine-grained token with read-only Contents,
-Issues and Metadata on all repositories (Renovate reads a repository's
-issues), and a lifetime of at most 366 days: the SUSE enterprise refuses
-longer-lived tokens, which breaks the lookup of every fork of a SUSE-owned
-repository. GitLab is scanned only when the
-`RENOVATE_SCAN_GITLAB_TOKEN` secret holds a GitLab personal access token with
-`read_api` and `read_repository`, and Codeberg only when
-`RENOVATE_SCAN_CODEBERG_TOKEN` holds a Codeberg access token with
-`read:organization`, `read:repository`, `read:issue` and `read:user`
-(Renovate asks whether the owner is an organization). The issue names those
-repositories `gitlab.com/<path>` and `codeberg.org/<path>`. This repository
-is public, so the issue gives a private repository's held updates as a count.
+renovate-alert reports these privately, through Apprise: it reads the logs of
+the self-hosted Renovate runs, and of a weekly lookup-only run on GitHub, whose
+hosted Renovate writes no log. It also reports a dated update still pending 95
+days after its release, longer than any gate.
 
 ## Reusable workflows
 
@@ -364,6 +348,5 @@ config scan and optional ShellCheck. Inputs: `terraform_version`,
 `Conventional PR title`: fails unless the pull request title is a
 Conventional Commit subject.
 
-`renovate-config-validate.yml` and `renovate-held-scan.yml` are not reusable.
-The first validates `renovate-config.json` when it changes here. The second
-looks for held updates (see [Age gates and releases with no date](#age-gates-and-releases-with-no-date)).
+`renovate-config-validate.yml` is not reusable: it validates
+`renovate-config.json` when it changes here.
