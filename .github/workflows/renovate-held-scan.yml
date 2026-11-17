@@ -11,7 +11,7 @@ name: Renovate held updates
 # there for weeks.
 #
 # A Renovate lookup dry run (no branches, PRs or dashboard edits) over every
-# non-archived repo, on GitHub and on GitLab; scripts/renovate-held-report.py
+# non-archived repo, on GitHub, GitLab and Codeberg; scripts/renovate-held-report.py
 # turns the debug logs into one issue here, updated weekly and closed once
 # nothing is held. The logs themselves are never printed or uploaded: this
 # repo is public.
@@ -25,6 +25,12 @@ name: Renovate held updates
 # read_api and read_repository. Without it GitLab is not scanned. The
 # projects are those of the GITLAB_NAMESPACE variable's user, or of the user
 # named like this repo's owner; the report names them gitlab.com/<path>.
+#
+# RENOVATE_SCAN_CODEBERG_TOKEN (optional): a Codeberg (Forgejo) access token
+# with read:repository, read:issue and read:user. Without it Codeberg is not
+# scanned. The repos are those owned by the CODEBERG_NAMESPACE variable's
+# user, or by the user named like this repo's owner; the report names them
+# codeberg.org/<path>.
 
 on:
   schedule:
@@ -115,11 +121,40 @@ jobs:
           jq -rR 'fromjson? | select(.level >= 50) | "gitlab.com/\(.repository // "-"): \(.msg)"' gitlab.log \
             | sort -u | sed 's/^/::warning::/'
 
+      - name: Renovate lookup across the Codeberg repos
+        env:
+          CODEBERG_TOKEN: ${{ secrets.RENOVATE_SCAN_CODEBERG_TOKEN }}
+          GITHUB_COM_TOKEN: ${{ secrets.RENOVATE_SCAN_TOKEN || github.token }}
+          CODEBERG_OWNER: ${{ vars.CODEBERG_NAMESPACE || github.repository_owner }}
+        run: |
+          set -euo pipefail
+          : >codeberg.log
+          if [ -z "$CODEBERG_TOKEN" ]; then
+            echo "::notice::RENOVATE_SCAN_CODEBERG_TOKEN is not set: Codeberg is not scanned."
+            exit 0
+          fi
+          # The token's own repos: a private profile hides /users/<name>/repos.
+          curl -fsS --header "Authorization: token $CODEBERG_TOKEN" \
+            "https://codeberg.org/api/v1/user/repos?limit=50" \
+            | jq '[.[] | select(.owner.login == env.CODEBERG_OWNER and (.archived | not))]' >codeberg.json
+          mapfile -t repos < <(jq -r '.[].full_name' codeberg.json)
+          jq -r '.[] | select(.private or .internal) | "codeberg.org/" + .full_name' codeberg.json >codeberg-private.txt
+          cat codeberg-private.txt >>private.txt
+          echo "Scanning ${#repos[@]} Codeberg repositories ($(wc -l <codeberg-private.txt) private)."
+          RENOVATE_TOKEN="$CODEBERG_TOKEN" LOG_LEVEL=debug LOG_FORMAT=json npx --yes --package renovate -- renovate \
+            --platform=forgejo --endpoint=https://codeberg.org/api/v1/ --dry-run=lookup \
+            --require-config=required --onboarding=false \
+            --git-author="renovate-held-scan <noreply@github.com>" \
+            "${repos[@]}" >codeberg.log 2>&1 \
+            || echo "::warning::Renovate exited non-zero on Codeberg; the report covers what it looked up."
+          jq -rR 'fromjson? | select(.level >= 50) | "codeberg.org/\(.repository // "-"): \(.msg)"' codeberg.log \
+            | sort -u | sed 's/^/::warning::/'
+
       - name: Report
         id: report
         run: |
           set -euo pipefail
-          PRIVATE="$(cat private.txt)" python3 scripts/renovate-held-report.py github.log gitlab.com=gitlab.log >report.md
+          PRIVATE="$(cat private.txt)" python3 scripts/renovate-held-report.py github.log gitlab.com=gitlab.log codeberg.org=codeberg.log >report.md
           echo "count=$(head -1 report.md)" >>"$GITHUB_OUTPUT"
           tail -n +2 report.md | tee -a "$GITHUB_STEP_SUMMARY"
 
