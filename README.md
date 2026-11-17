@@ -191,6 +191,27 @@ The maintenance branch is rebuilt only on the schedule days
 (`updateNotScheduled: false`), so a release published midweek doesn't restart
 its CI before the weekend.
 
+### Age gates and releases with no date
+
+The gates (`minimumReleaseAge`: 30 days for majors, 14 for minors, 7 for
+patches) run with Renovate's default
+`minimumReleaseAgeBehaviour=timestamp-required`. A release whose datasource
+gives no date never passes its gate. Renovate logs that only at debug level.
+When the release shares a branch with dated updates, the Dependency Dashboard
+doesn't show it either. Give such a package a dated lookup: a `custom.*`
+datasource, `github-tags` for an image built from tagged sources, or
+`custom.dockerhub-suffix` for a Docker Hub image with more than 1,000 tags.
+
+`renovate-held-scan.yml` looks for these every Sunday. It runs a Renovate
+lookup dry run over every non-archived repository and keeps one issue here,
+"Renovate updates held by the age gate", up to date. The issue closes once
+nothing is held. Two kinds of update count as held: a release with no date,
+and a dated update still pending after 95 days, longer than any gate. Without
+the optional `RENOVATE_SCAN_TOKEN` secret, the scan reads only the public
+repositories. The secret is a fine-grained token with read-only Contents and
+Metadata on all repositories. This repository is public, so the issue gives a
+private repository's held updates as a count.
+
 ## Reusable workflows
 
 Check names (`<caller job> / <job name>`) are what the repositories' rulesets
@@ -332,5 +353,6 @@ config scan and optional ShellCheck. Inputs: `terraform_version`,
 `Conventional PR title`: fails unless the pull request title is a
 Conventional Commit subject.
 
-`renovate-config-validate.yml` is not reusable: it validates
-`renovate-config.json` when it changes here.
+`renovate-config-validate.yml` and `renovate-held-scan.yml` are not reusable.
+The first validates `renovate-config.json` when it changes here. The second
+looks for held updates (see [Age gates and releases with no date](#age-gates-and-releases-with-no-date)).
