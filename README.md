@@ -17,7 +17,7 @@ GitLab:
 
 | Event | What runs |
 |---|---|
-| Pull request | Title check (a Conventional Commit, since the squash-merge subject is the PR title and auto-release reads it). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push, the image policy check and the smoke test, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
+| Pull request | Commit check: commitlint over every commit (pull requests are rebase-merged, so the commits land as they are and auto-release reads their subjects). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push, the image policy check and the smoke test, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
 | Push to the default branch | Security check only: auto-release's `security` strategy releases a CVE fix at once, including a fresh rebuild when the last release is a week old and its image has fixable findings in packages it installs on top of its base. Nothing is built, except with `publish: push` (the Cloud Run repositories, which deploy every push that changes the image). |
 | Monday 06:00 UTC schedule | Conventional release: auto-release tags `vX.Y.Z` when a `feat`, `fix`, `perf`, `revert` or breaking commit landed since the last tag, or a fresh rebuild is due. Nothing is built or linted, with either `publish` mode: the tag it creates builds. |
 | Release tag `vX.Y.Z` | Build, the image policy check and the smoke test; push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
@@ -68,8 +68,9 @@ jobs:
     secrets: inherit
 ```
 
-plus a `pr-title.yml` that calls `pr-title.yml` on `pull_request`
-(`types: [opened, edited, synchronize, reopened]`).
+plus a `commits.yml` that calls `commits.yml` on `pull_request`. Every
+public repository's ruleset allows only rebase merges and requires
+`commits / Conventional commits`.
 
 ## Container images
 
@@ -343,10 +344,16 @@ config scan and optional ShellCheck. Inputs: `terraform_version`,
 `opentofu_version`, `working_dir`, `example_dir`, `enable_shellcheck`,
 `shellcheck_files`.
 
-### pr-title.yml
+### commits.yml
 
-`Conventional PR title`: fails unless the pull request title is a
-Conventional Commit subject.
+`Conventional commits`: lints every commit of the pull request with
+`.github/actions/commitlint`, the shared commitlint base (a copy of the
+dotfiles `~/.commitlintrc.mjs`): config-conventional, 72-character header
+and body lines (Renovate's `update … from … to … (<type>)` headers up to
+100), no `Co-authored-by` or AI "Generated with" lines. It reads the
+messages from the API, so it needs only `pull-requests: read`. It replaced
+`pr-title.yml` on 2026-11-18, when the merges moved from squash (the PR
+title and description became the commit, unlinted) to rebase.
 
 `renovate-config-validate.yml` is not reusable: it validates
 `renovate-config.json` when it changes here.
