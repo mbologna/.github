@@ -1,0 +1,8 @@
+{
+  "name": "commitlint-action",
+  "private": true,
+  "description": "The commitlint action's npm tools: npm ci installs the lockfile's exact tree. @commitlint/cli brings @commitlint/config-conventional, which base.mjs extends",
+  "dependencies": {
+    "@commitlint/cli": "21.2.4"
+  }
+}
