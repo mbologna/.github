@@ -1,0 +1,24 @@
+name: Commits
+
+# Lints every commit of a pull request with the shared commitlint base
+# (.github/actions/commitlint). Pull requests are rebase-merged, so their
+# commits land on the default branch as they are, and auto-release reads
+# their subjects for the version bump and the release notes. Callers run it
+# from their own commits.yml on `pull_request`.
+#
+# The action is pinned like any other: a change to it reaches the callers
+# once this pin moves, and then theirs.
+
+on:
+  workflow_call:
+  # This repository's own pull requests.
+  pull_request:
+
+jobs:
+  commits:
+    name: Conventional commits
+    runs-on: ubuntu-26.04
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: mbologna/.github/.github/actions/commitlint@795d0dce2d47c06ffd80e1be38f3bb570481a6d8 # main
