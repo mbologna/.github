@@ -1,13 +1,14 @@
 name: Commits
 
-# Lints every commit of a pull request with the shared commitlint base
-# (.github/actions/commitlint). Pull requests are rebase-merged, so their
-# commits land on the default branch as they are, and auto-release reads
-# their subjects for the version bump and the release notes. Callers run it
-# from their own commits.yml on `pull_request`.
+# Lints every commit of a pull request with mbologna/commitlint-config's
+# action: the shared commit rules, plus a gate that fails fixup!, squash! and
+# amend! commits. Pull requests merge with a merge commit, so their commits
+# land on the default branch as they are, and auto-release reads their
+# subjects for the version bump and the release notes. Callers run it from
+# their own commits.yml on `pull_request`.
 #
-# The action is pinned like any other: a change to it reaches the callers
-# once this pin moves, and then theirs.
+# The action is pinned like any other: a rule change reaches the callers once
+# this pin moves, and then theirs.
 
 on:
   workflow_call:
@@ -21,4 +22,4 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: mbologna/.github/.github/actions/commitlint@795d0dce2d47c06ffd80e1be38f3bb570481a6d8 # main
+      - uses: mbologna/commitlint-config@81880b04ef3a10cc75db40cf0372c375a2d079bc # main
