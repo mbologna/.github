@@ -1,11 +1,13 @@
 name: Commits
 
 # Lints every commit of a pull request with mbologna/commitlint-config's
-# action: the shared commit rules, plus a gate that fails fixup!, squash! and
-# amend! commits. Pull requests merge with a merge commit, so their commits
-# land on the default branch as they are, and auto-release reads their
-# subjects for the version bump and the release notes. Callers run it from
-# their own commits.yml on `pull_request`. The private repositories, which
+# action: the shared commit rules, plus gates that fail fixup!, squash! and
+# amend! commits and commits that put 4 or more files back to older versions
+# (a stale index; the action clones the history that check reads itself).
+# Pull requests merge with a merge commit, so their commits land on the
+# default branch as they are, and auto-release reads their subjects for the
+# version bump and the release notes. Callers run it from their own
+# commits.yml on `pull_request`. The private repositories, which
 # GitHub Free gives no rulesets, also run it on `push` to main: there it
 # reports a commit that reached main without a pull request, and can't block.
 #
@@ -26,4 +28,4 @@ jobs:
     # one also grants contents: read, which the push mode's compare and commit
     # API calls need there.
     steps:
-      - uses: mbologna/commitlint-config@7528913b5859d0f5567e50291ff7891cb7ea8a87 # v0.2.0
+      - uses: mbologna/commitlint-config@369e316de225dab75f9b4e3ba9deca6704ecfb3c # v0.3.0
