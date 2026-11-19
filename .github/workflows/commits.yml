@@ -21,10 +21,9 @@ jobs:
   commits:
     name: Conventional commits
     runs-on: ubuntu-26.04
-    permissions:
-      # contents: the private repositories' commits (the compare and commit
-      # API); public repositories' are readable without it.
-      contents: read
-      pull-requests: read
+    # No permissions block: the job takes the caller's, which a called job
+    # could only narrow. Public callers grant pull-requests: read; a private
+    # one also grants contents: read, which the push mode's compare and commit
+    # API calls need there.
     steps:
       - uses: mbologna/commitlint-config@7528913b5859d0f5567e50291ff7891cb7ea8a87 # v0.2.0
