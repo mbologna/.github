@@ -17,6 +17,15 @@ on:
         required: false
         type: string
         default: ""
+      cleanup_keep_tags:
+        description: >-
+          Optional regular expression of extra tags the GHCR cleanup never
+          deletes, e.g. '^sha-b47c648$' for an old image a test fixture pins.
+          Joined to the built-in exclusions (latest, main, master and release
+          tags) with |, so it follows the same rules: no nested quantifiers.
+        required: false
+        type: string
+        default: ""
       dockerfile:
         description: Dockerfile path, relative to the repository root
         required: false
@@ -989,8 +998,13 @@ jobs:
           # keep-n-tagged counted every sha-*/branch tag, and a busy day of main
           # pushes deleted backup-monitor's 1.0.0 image while hotel still pinned
           # it (2026-10-22).
-          exclude-tags: '^(latest|main|master)$|^v?[0-9][0-9.]*$|^v?[0-9][0-9.]*-[0-9A-Za-z.]+$'
+          # cleanup_keep_tags adds the caller's own exclusions.
+          exclude-tags: >-
+            ^(latest|main|master)$|^v?[0-9][0-9.]*$|^v?[0-9][0-9.]*-[0-9A-Za-z.]+${{ inputs.cleanup_keep_tags && format('|{0}', inputs.cleanup_keep_tags) || '' }}
           use-regex: true
+          # Signatures, attestations and SBOM referrers (sha256-<digest> tags)
+          # whose image is gone: deleting an image left them behind.
+          delete-orphaned-images: true
 
   # auto-release.yml carries its own gate (schedule, or a push or manual run
   # on the default branch), so this job only needs a strategy. It follows the
