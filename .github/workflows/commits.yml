@@ -5,7 +5,9 @@ name: Commits
 # amend! commits. Pull requests merge with a merge commit, so their commits
 # land on the default branch as they are, and auto-release reads their
 # subjects for the version bump and the release notes. Callers run it from
-# their own commits.yml on `pull_request`.
+# their own commits.yml on `pull_request`. The private repositories, which
+# GitHub Free gives no rulesets, also run it on `push` to main: there it
+# reports a commit that reached main without a pull request, and can't block.
 #
 # The action is pinned like any other: a rule change reaches the callers once
 # this pin moves, and then theirs.
@@ -22,4 +24,4 @@ jobs:
     permissions:
       pull-requests: read
     steps:
-      - uses: mbologna/commitlint-config@81880b04ef3a10cc75db40cf0372c375a2d079bc # main
+      - uses: mbologna/commitlint-config@7528913b5859d0f5567e50291ff7891cb7ea8a87 # v0.2.0
