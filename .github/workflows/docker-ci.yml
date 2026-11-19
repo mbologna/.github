@@ -796,7 +796,6 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ steps.rules.outputs.latest }}
             type=sha,prefix=sha-
-            type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             ${{ steps.version.outputs.version && format('type=raw,value={0},enable={1}', steps.version.outputs.version, steps.rules.outputs.version) || '' }}
@@ -1041,6 +1040,7 @@ jobs:
     uses: ./.github/workflows/gcp-deploy.yml
     with:
       image_name: ${{ inputs.image_name }}
+      image_digest: ${{ needs.merge.outputs.digest }}
       deploy_type: ${{ inputs.deploy_type }}
       deploy_name: ${{ inputs.deploy_name || inputs.image_name }}
       region: ${{ inputs.region }}
