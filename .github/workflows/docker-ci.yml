@@ -21,8 +21,7 @@ on:
         description: >-
           Optional regular expression of extra tags the GHCR cleanup never
           deletes, e.g. '^sha-b47c648$' for an old image a test fixture pins.
-          Joined to the built-in exclusions (latest, main, master and release
-          tags) with |, so it follows the same rules: no nested quantifiers.
+          Joined to the built-in exclusions (latest and release tags) with |, so it follows the same rules: no nested quantifiers.
         required: false
         type: string
         default: ""
@@ -995,13 +994,14 @@ jobs:
           # Release tags (1.0.0, v2.3, 3006, 4.5.2-rc1) are what consumers pin as
           # tag@digest, so never delete them. With only latest,main excluded,
           # keep-n-tagged counted every sha-*/branch tag, and a busy day of main
-          # pushes deleted backup-monitor's 1.0.0 image while hotel still pinned
-          # it (2026-10-22).
+          # pushes deleted backup-monitor's 1.0.0 image while a cluster still
+          # pinned it (2026-10-22). No main/master: images get no branch tags,
+          # and excluding them kept old main-tagged versions forever.
           # cleanup_keep_tags adds the caller's own exclusions. The whole value
           # is one format(): a literal "$" right before "${{" is swallowed by
           # the expression syntax, which dropped the last rule's anchor.
           exclude-tags: >-
-            ${{ format('^(latest|main|master)$|^v?[0-9][0-9.]*$|^v?[0-9][0-9.]*-[0-9A-Za-z.]+${0}', inputs.cleanup_keep_tags && format('|{0}', inputs.cleanup_keep_tags) || '') }}
+            ${{ format('^latest$|^v?[0-9][0-9.]*$|^v?[0-9][0-9.]*-[0-9A-Za-z.]+${0}', inputs.cleanup_keep_tags && format('|{0}', inputs.cleanup_keep_tags) || '') }}
           use-regex: true
           # Signatures, attestations and SBOM referrers (sha256-<digest> tags)
           # whose image is gone: deleting an image left them behind.
