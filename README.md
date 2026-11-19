@@ -251,7 +251,7 @@ versions.) `smoke_cmd` decides what runs:
 | `allowed_tools` | empty | Tools the image policy check lets the image keep on its binary paths, separated by spaces or commas (see [Container images](#container-images)) |
 | `allow_root` | empty | Why the image runs as root; non-empty lets the image policy check pass a root image and prints the reason |
 | `legacy_image_names` | empty | Former image names that keep getting the same tags |
-| `cleanup_keep_tags` | empty | Regular expression of extra tags the GHCR cleanup keeps, joined to the built-in exclusions (`latest`, `main`, `master`, release tags) |
+| `cleanup_keep_tags` | empty | Regular expression of extra tags the GHCR cleanup keeps, joined to the built-in exclusions (`latest`, release tags) |
 | `smoke_cmd` | empty | Smoke test: a shell command that must exit 0 in the built image; empty runs the entrypoint with `--help` and only warns; `none` skips it |
 | `version_command` | empty | Command run in the image that prints a version to tag |
 | `extra_tags` | empty | Extra docker/metadata-action tag rules |
