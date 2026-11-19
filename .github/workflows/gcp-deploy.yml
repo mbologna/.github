@@ -4,7 +4,10 @@ on:
   workflow_call:
     inputs:
       image_name:
-        description: Image name (e.g. sunrise-sunset-calendar), deployed as {image_registry}/{image_name}:sha-{commit}
+        description: >-
+          Image name (e.g. sunrise-sunset-calendar), deployed as
+          {image_registry}/{image_name}@{image_digest}, or as
+          {image_registry}/{image_name}:sha-{commit} when image_digest is empty
         required: true
         type: string
       image_registry:
@@ -16,6 +19,14 @@ on:
         required: false
         type: string
         default: us-central1-docker.pkg.dev/infra-cove/ghcr/mbologna
+      image_digest:
+        description: >-
+          Multi-arch digest (sha256:...) to deploy. docker-ci passes the digest
+          it just pushed, so the revision runs exactly that image whatever its
+          tags point at later. Empty falls back to the sha-<commit> tag.
+        required: false
+        type: string
+        default: ""
       deploy_type:
         description: "Cloud Run resource type: 'service' or 'job'"
         required: false
@@ -66,7 +77,8 @@ jobs:
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
 
       # The image comes through an Artifact Registry remote repository, which
-      # fetches a fresh tag from ghcr.io on the first request. docker.io images
+      # fetches a digest (or a fresh tag) from ghcr.io on the first request. A
+      # digest is immutable, so the cache can never hand back an older image. docker.io images
       # came through mirror.gcr.io instead, which could list a tag before it
       # could serve the image, so deploys failed with "Container import failed"
       # for minutes (2026-10-22 in three repos, 2026-11-10), even with a wait
@@ -77,9 +89,20 @@ jobs:
           DEPLOY_NAME: ${{ inputs.deploy_name }}
           IMAGE_NAME: ${{ inputs.image_name }}
           IMAGE_REGISTRY: ${{ inputs.image_registry }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
           SHORT_SHA: ${{ steps.sha.outputs.short }}
           REGION: ${{ inputs.region }}
         run: |
+          if [[ -n $IMAGE_DIGEST ]]; then
+            if ! [[ $IMAGE_DIGEST =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::image_digest must be sha256:<64 hex>, got '$IMAGE_DIGEST'"
+              exit 1
+            fi
+            image="$IMAGE_REGISTRY/$IMAGE_NAME@$IMAGE_DIGEST"
+          else
+            image="$IMAGE_REGISTRY/$IMAGE_NAME:sha-$SHORT_SHA"
+          fi
+          echo "Deploying $image"
           # Jobs take no --update-labels, and Terraform owns their labels.
           if [[ $DEPLOY_TYPE == service ]]; then
             cmd=(gcloud run deploy --update-labels "managed-by=github-actions,commit-sha=$GITHUB_SHA")
@@ -88,7 +111,7 @@ jobs:
           fi
           for attempt in 1 2 3; do
             if "${cmd[@]}" "$DEPLOY_NAME" \
-                --image "$IMAGE_REGISTRY/$IMAGE_NAME:sha-$SHORT_SHA" \
+                --image "$image" \
                 --region "$REGION" \
                 --quiet; then
               exit 0

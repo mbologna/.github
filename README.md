@@ -263,7 +263,7 @@ versions.) `smoke_cmd` decides what runs:
 | `release_image` | `ghcr.io/<owner>/<image_name>` | Image auto-release logs in to and scans for a fresh rebuild |
 | `dockerfiles` | the `dockerfile` input | Dockerfiles the security strategy compares |
 | `dispatch_workflow` | the calling workflow | Workflow auto-release starts on the new tag |
-| `deploy_type` | empty | `service` or `job`: deploy the `sha-*` image to Cloud Run after a push or manual run on the default branch that pushed an image; empty deploys nothing |
+| `deploy_type` | empty | `service` or `job`: deploy the image just pushed, by digest, to Cloud Run after a push or manual run on the default branch that pushed an image; empty deploys nothing |
 | `deploy_name` | `image_name` | Cloud Run service or job |
 | `region` | `us-central1` | Cloud Run region |
 
@@ -285,10 +285,12 @@ Inputs: `strategy` (required, `conventional` or `commits`), `image`,
 
 ### gcp-deploy.yml
 
-Deploys `<image_registry>/<image_name>:sha-<commit>` to a Cloud Run service or
-job with Workload Identity Federation. docker-ci calls it through
-`deploy_type`. Inputs: `image_name`, `deploy_name` (required), `deploy_type`
-(default `service`), `region` (default `us-central1`), `image_registry`.
+Deploys `<image_registry>/<image_name>@<image_digest>` to a Cloud Run service
+or job with Workload Identity Federation; with no `image_digest` it deploys the
+`sha-<commit>` tag. docker-ci calls it through `deploy_type` and passes the
+digest it pushed, so a revision always runs that exact image. Inputs:
+`image_name`, `deploy_name` (required), `image_digest`, `deploy_type` (default
+`service`), `region` (default `us-central1`), `image_registry`.
 Secrets: `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`.
 
 ### python-ci.yml
