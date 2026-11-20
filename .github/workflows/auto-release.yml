@@ -50,6 +50,23 @@ on:
         required: false
         type: string
         default: ""
+      metadata_command:
+        description: >-
+          Shell command, run in the checkout, printing the pinned upstream
+          version as SemVer build metadata: up2.15.3 makes the next tag
+          v1.4.0+up2.15.3, and a change in it releases (pattern A of
+          VERSIONING.md)
+        required: false
+        type: string
+        default: ""
+      upstream_command:
+        description: >-
+          Shell command, run in the checkout, printing the upstream version of
+          a patched upstream image: tags become v<upstream>+r<N> (pattern B of
+          VERSIONING.md). Excludes metadata_command
+        required: false
+        type: string
+        default: ""
       dry_run:
         description: >-
           Only print the next version and its notes, in the job summary. A
@@ -101,6 +118,9 @@ jobs:
           # In a called workflow, github.workflow_ref is the caller's:
           # owner/repo/.github/workflows/ci.yml@refs/heads/main
           AUTO_RELEASE_DISPATCH_WORKFLOW: ${{ inputs.dispatch_workflow || github.workflow_ref }}
+          # Empty means unset to auto-release: plain vX.Y.Z tags.
+          AUTO_RELEASE_METADATA_CMD: ${{ inputs.metadata_command }}
+          AUTO_RELEASE_UPSTREAM_CMD: ${{ inputs.upstream_command }}
           GITHUB_TOKEN: ${{ github.token }}
         # The strategy depends on what started the run:
         # - push: only a CVE fix (a fix(security) commit, a base image update

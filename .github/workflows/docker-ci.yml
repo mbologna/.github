@@ -162,6 +162,22 @@ on:
         required: false
         type: string
         default: ""
+      release_metadata_command:
+        description: >-
+          Shell command printing the pinned upstream version as SemVer build
+          metadata (e.g. up3.6 -> tag v5.2.0+up3.6); passed to auto-release.yml
+          as metadata_command. Images stay X.Y.Z, X.Y and latest
+        required: false
+        type: string
+        default: ""
+      release_upstream_command:
+        description: >-
+          Shell command printing the upstream version of a patched upstream
+          image (e.g. 4.5.2 -> tag v4.5.2+r1, images 4.5.2-r1, 4.5.2, 4.5 and
+          latest); passed to auto-release.yml as upstream_command
+        required: false
+        type: string
+        default: ""
       deploy_type:
         description: >-
           Deploys the image to Cloud Run with gcp-deploy.yml when set: 'service'
@@ -683,6 +699,10 @@ jobs:
       # release, so dispatching an older tag's build again leaves it alone.
       # Pre-release tags never get it. With publish: push, latest follows the
       # default branch (and metadata-action's own handling of semver tags).
+      # Release tags may carry build metadata (v5.2.0+up3.6), which does not
+      # order them; upstream releases (v4.5.2+r1, v7d1914b5-ls396+r2) are
+      # ordered by date, as auto-release orders them, since an upstream
+      # version need not sort.
       - name: Choose the tag rules
         id: rules
         env:
@@ -690,8 +710,14 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$PUBLISH" = release ]; then
-            newest=$(git ls-remote --tags --refs origin 'refs/tags/v*' | sed 's#.*refs/tags/##' |
-              grep -E '^v[0-9]+(\.[0-9]+)*$' | sort -V | tail -n 1)
+            if [[ $GITHUB_REF_NAME =~ ^v[0-9A-Za-z][0-9A-Za-z.-]*\+r[0-9]+$ ]]; then
+              git fetch --quiet --depth=1 --tags origin
+              newest=$(git for-each-ref --sort=-creatordate --format='%(refname:short)' 'refs/tags/v*' |
+                grep -E '^v[0-9A-Za-z][0-9A-Za-z.-]*\+r[0-9]+$' | head -n 1)
+            else
+              newest=$(git ls-remote --tags --refs origin 'refs/tags/v*' | sed 's#.*refs/tags/##' |
+                grep -E '^v[0-9]+(\.[0-9]+)*(\+[0-9A-Za-z.-]+)?$' | sort -V | tail -n 1)
+            fi
             latest=false
             if [ "$GITHUB_REF_NAME" = "$newest" ]; then latest=true; fi
             echo "newest release: ${newest:-none}; ${GITHUB_REF_NAME} gets latest: ${latest}"
@@ -767,6 +793,24 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "major=${version%%.*}" >> "$GITHUB_OUTPUT"
 
+      # v<upstream>+r<N> (auto-release's upstream mode) publishes
+      # <upstream>-r<N>, which never moves, and <upstream>, which follows the
+      # newest release of that upstream version. OCI tags have no +. For a
+      # semver upstream the semver rules below already add 4.5.2 and 4.5;
+      # metadata-action drops the +r<N> there, as it drops any build metadata.
+      - name: Read the upstream release
+        id: upstream
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          if [[ $GITHUB_REF_NAME =~ ^v([0-9A-Za-z][0-9A-Za-z.-]*)\+r([0-9]+)$ ]]; then
+            upstream=${BASH_REMATCH[1]} revision=${BASH_REMATCH[2]}
+            echo "release=${upstream}-r${revision}" >> "$GITHUB_OUTPUT"
+            if ! [[ $upstream =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "upstream=${upstream}" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
       - name: List image names
         id: images
         env:
@@ -799,6 +843,8 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             ${{ steps.version.outputs.version && format('type=raw,value={0},enable={1}', steps.version.outputs.version, steps.rules.outputs.version) || '' }}
             ${{ steps.version.outputs.major && format('type=raw,value={0},enable={1}', steps.version.outputs.major, steps.rules.outputs.version) || '' }}
+            ${{ steps.upstream.outputs.release && format('type=raw,value={0}', steps.upstream.outputs.release) || '' }}
+            ${{ steps.upstream.outputs.upstream && format('type=raw,value={0}', steps.upstream.outputs.upstream) || '' }}
             ${{ inputs.extra_tags }}
 
       - name: Create multi-arch manifest and push tags
@@ -1024,6 +1070,8 @@ jobs:
       image: ${{ inputs.release_image || format('ghcr.io/{0}/{1}', github.repository_owner, inputs.image_name) }}
       dockerfiles: ${{ inputs.dockerfiles || inputs.dockerfile }}
       dispatch_workflow: ${{ inputs.dispatch_workflow }}
+      metadata_command: ${{ inputs.release_metadata_command }}
+      upstream_command: ${{ inputs.release_upstream_command }}
 
   # Runs this commit's sha-* image on Cloud Run, only when the merge job
   # pushed one on the default branch: a docs- or CI-only push that skip_paths
