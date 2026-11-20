@@ -152,3 +152,64 @@ jobs:
           esac
           echo "strategy: $strategy (event $EVENT, caller's $STRATEGY)"
           AUTO_RELEASE_STRATEGY=$strategy auto-release release
+
+  # What the next scheduled run would release, in the job summary: on a pull
+  # request as if it merged now, on a push to the default branch as the
+  # branch stands. It runs after the release job, so a push that released a
+  # CVE fix previews from the new tag. It only plans: no tag, no Release, and
+  # no image scan, so a fresh rebuild the scheduled run finds isn't shown.
+  preview:
+    name: Release preview (${{ inputs.strategy }})
+    needs: auto-release
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'pull_request' ||
+      (github.event_name == 'push' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    container:
+      image: ghcr.io/mbologna/auto-release:2.0.0@sha256:1d9eec77b1b06cd84e06c371a989b989fcf7f4f6d5171ec6789dd8d5ab0aa07a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      # A pull request checks out GitHub's test merge, whose "Merge <sha> into
+      # <sha>" subject would land in the notes. Give it the subject the real
+      # merge commit gets, which the notes skip. The job container runs as
+      # root on the runner user's checkout, hence safe.directory.
+      - name: Name the merge like the real one
+        if: github.event_name == 'pull_request'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_LABEL: ${{ github.event.pull_request.head.label }}
+        run: |
+          git -c safe.directory="$PWD" -c user.name=auto-release -c user.email=auto-release@localhost \
+            commit --amend --quiet --allow-empty -m "Merge pull request #$PR_NUMBER from $HEAD_LABEL"
+
+      - name: Preview
+        env:
+          EVENT: ${{ github.event_name }}
+          STRATEGY: ${{ inputs.strategy }}
+          SCANS_IMAGES: ${{ inputs.image != '' || inputs.images != '' }}
+          AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
+          AUTO_RELEASE_METADATA_CMD: ${{ inputs.metadata_command }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          scheduled=$STRATEGY
+          if [ "$scheduled" = docker ]; then scheduled=conventional; fi
+          {
+            if [ "$EVENT" = pull_request ]; then
+              printf 'What the next scheduled run (%s) releases if this pull request merges now.\n\n' "$scheduled"
+            else
+              printf 'What the next scheduled run (%s) releases as this branch stands.\n\n' "$scheduled"
+            fi
+            if [ "$SCANS_IMAGES" = true ]; then
+              printf 'Images are not scanned here: a fresh rebuild that run finds can still release.\n\n'
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
+          AUTO_RELEASE_STRATEGY=$scheduled auto-release plan
+          grep -q '^## Next release' "$GITHUB_STEP_SUMMARY" ||
+            printf 'No release due.\n' >>"$GITHUB_STEP_SUMMARY"
