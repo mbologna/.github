@@ -157,7 +157,10 @@ jobs:
   # request as if it merged now, on a push to the default branch as the
   # branch stands. It runs after the release job, so a push that released a
   # CVE fix previews from the new tag. It only plans: no tag, no Release, and
-  # no image scan, so a fresh rebuild the scheduled run finds isn't shown.
+  # no image scan. auto-release measures the last tag's age at the time it
+  # runs, so a maintenance release or fresh rebuild that only becomes due by
+  # the scheduled run isn't shown; a fresh rebuild due now is the push's own
+  # release job's to cut.
   preview:
     name: Release preview (${{ inputs.strategy }})
     needs: auto-release
@@ -193,7 +196,7 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           STRATEGY: ${{ inputs.strategy }}
-          SCANS_IMAGES: ${{ inputs.image != '' || inputs.images != '' }}
+          HAS_IMAGES: ${{ inputs.image != '' || inputs.images != '' }}
           AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
           AUTO_RELEASE_METADATA_CMD: ${{ inputs.metadata_command }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -206,8 +209,11 @@ jobs:
             else
               printf 'What the next scheduled run (%s) releases as this branch stands.\n\n' "$scheduled"
             fi
-            if [ "$SCANS_IMAGES" = true ]; then
-              printf 'Images are not scanned here: a fresh rebuild that run finds can still release.\n\n'
+            if [ "$scheduled" = conventional ]; then
+              printf 'Not shown: a maintenance release (only dependency updates) that becomes due once the last tag is old enough by that run.\n\n'
+            fi
+            if [ "$HAS_IMAGES" = true ]; then
+              printf 'Not shown: a fresh rebuild that becomes due by that run. Images are not scanned here; a push to the default branch releases one that is due now.\n\n'
             fi
           } >>"$GITHUB_STEP_SUMMARY"
           AUTO_RELEASE_STRATEGY=$scheduled auto-release plan
