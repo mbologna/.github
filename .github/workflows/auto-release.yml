@@ -19,7 +19,7 @@ on:
         type: string
       image:
         description: >-
-          Image without a tag (e.g. ghcr.io/mbologna/docker-bitlbee) that
+          Image without a tag (e.g. ghcr.io/mbologna/bitlbee) that
           auto-release logs in to and, for a fresh rebuild, scans at the last
           version
         required: false
