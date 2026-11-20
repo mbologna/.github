@@ -11,5 +11,4 @@ commit SHA and Renovate moves the pins; the Renovate preset is read from `main`.
 - Never create tags here. A change reaches callers through their next pin update.
 - [VERSIONING.md](VERSIONING.md) is the versioning standard for every mbologna
   repository. A change to how auto-release, `docker-ci.yml` or the ci-templates
-  components form or order tags must keep it true, and a new pattern B image needs its
-  Renovate regex rule in `renovate-config.json`.
+  components form or order tags must keep it true.

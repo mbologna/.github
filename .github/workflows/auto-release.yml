@@ -65,16 +65,15 @@ on:
         description: >-
           Shell command, run in the checkout, printing the pinned upstream
           version as SemVer build metadata: up2.15.3 makes the next tag
-          v1.4.0+up2.15.3, and a change in it releases (pattern A of
-          VERSIONING.md)
+          v1.4.0+up2.15.3, and a change in it releases (VERSIONING.md)
         required: false
         type: string
         default: ""
       upstream_command:
         description: >-
           Shell command, run in the checkout, printing the upstream version of
-          a patched upstream image: tags become v<upstream>+r<N> (pattern B of
-          VERSIONING.md). Excludes metadata_command
+          a patched upstream image: tags become v<upstream>+r<N>, which isn't
+          SemVer and which VERSIONING.md doesn't use. Excludes metadata_command
         required: false
         type: string
         default: ""
