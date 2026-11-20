@@ -924,6 +924,26 @@
       "minimumReleaseAgeBehaviour": "timestamp-optional"
     },
     {
+      "description": "Patched upstream images (pattern B of VERSIONING.md) are tagged <upstream>-r<N>: N counts this repository's releases of one upstream version. Docker versioning reads -r<N> as a variant suffix that must stay the same, so it never offered -r1 to -r2 (the problem Bitnami's -rN and linuxserver's -lsN tags have). The regex makes N a version part. Only the -r<N> tags match, so the moving 4.5.2, 4.5 and latest tags are never proposed.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "**/mbologna/thelounge-patched"
+      ],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-r(?<build>\\d+)$"
+    },
+    {
+      "description": "A patched image follows linuxserver's builds, tagged <commit>-ls<build>, plus -r<N> (pattern B of VERSIONING.md): 7d1914b5-ls396-r1. The commit doesn't sort, so the regex leaves it uncaptured and orders by the linuxserver build (as a minor) and N (as a patch).",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "**/mbologna/patched-image"
+      ],
+      "versioning": "regex:^[0-9a-f]+-ls(?<minor>\\d+)-r(?<patch>\\d+)$"
+    },
+    {
       "description": "kustomize release tags are kustomize/vX.Y.Z (the repo also tags api/, cmd/config/, kyaml/ modules). Without extractVersion no tag parses as a version and a kustomize version pinned from github-releases never gets an update.",
       "matchDepNames": [
         "kubernetes-sigs/kustomize"

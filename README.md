@@ -9,6 +9,9 @@ repositories under `mbologna`. The GitLab projects get the same pipeline from
   and keeps only what is specific to it.
 - [`.github/workflows/`](.github/workflows): reusable workflows. Callers pin
   them to a commit SHA with a `# main` comment, and Renovate moves the pin.
+- [`VERSIONING.md`](VERSIONING.md): how every repository versions its
+  releases: SemVer, SemVer with the upstream as build metadata, or upstream
+  version and release number.
 
 ## Pipeline contract
 
@@ -20,7 +23,7 @@ GitLab:
 | Pull request | Commit check: commitlint over every commit, and no `fixup!` commits (pull requests merge with a merge commit, so the commits land as they are and auto-release reads their subjects). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push, the image policy check and the smoke test, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
 | Push to the default branch | Security check only: auto-release's `security` strategy releases a CVE fix at once, including a fresh rebuild when the last release is a week old and its image has fixable findings in packages it installs on top of its base. Nothing is built, except with `publish: push` (the Cloud Run repositories, which deploy every push that changes the image). |
 | Monday 06:00 UTC schedule | Conventional release: auto-release tags `vX.Y.Z` when a `feat`, `fix`, `perf`, `revert` or breaking commit landed since the last tag, or a fresh rebuild is due. Nothing is built or linted, with either `publish` mode: the tag it creates builds. |
-| Release tag `vX.Y.Z` | Build, the image policy check and the smoke test; push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
+| Release tag `vX.Y.Z` (or a [VERSIONING.md](VERSIONING.md) variant) | Build, the image policy check and the smoke test; push `X.Y.Z`, `X.Y` and `latest` (`v4.5.2+r1` also pushes `4.5.2-r1`), then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
 
 What differs from GitLab, on purpose:
 
@@ -263,6 +266,8 @@ versions.) `smoke_cmd` decides what runs:
 | `release_image` | `ghcr.io/<owner>/<image_name>` | Image auto-release logs in to and scans for a fresh rebuild |
 | `dockerfiles` | the `dockerfile` input | Dockerfiles the security strategy compares |
 | `dispatch_workflow` | the calling workflow | Workflow auto-release starts on the new tag |
+| `release_metadata_command` | empty | Command printing the pinned upstream as build metadata (`up3.6` → `v5.2.0+up3.6`); see [VERSIONING.md](VERSIONING.md) |
+| `release_upstream_command` | empty | Command printing the upstream version of a patched upstream image (`4.5.2` → `v4.5.2+r1`, images `4.5.2-r1`, `4.5.2`, `4.5`, `latest`) |
 | `deploy_type` | empty | `service` or `job`: deploy the image just pushed, by digest, to Cloud Run after a push or manual run on the default branch that pushed an image; empty deploys nothing |
 | `deploy_name` | `image_name` | Cloud Run service or job |
 | `region` | `us-central1` | Cloud Run region |
@@ -280,8 +285,10 @@ and `actions: write`; the caller lists `workflow_dispatch` in its `on:`.
 
 Inputs: `strategy` (required, `conventional` or `commits`), `image`,
 `dockerfiles`, `base_image_pattern`, `dispatch_tag_build` (default `true`),
-`dispatch_workflow`, `dry_run` (also true when the caller's
-`workflow_dispatch` has a `dry_run` input set to true).
+`dispatch_workflow`, `metadata_command` and `upstream_command` (the tag
+schemes of [VERSIONING.md](VERSIONING.md); they exclude each other),
+`dry_run` (also true when the caller's `workflow_dispatch` has a `dry_run`
+input set to true).
 
 ### gcp-deploy.yml
 
@@ -371,3 +378,9 @@ in the pull request.
 
 `renovate-config-validate.yml` is not reusable: it validates
 `renovate-config.json` when it changes here.
+
+## Versioning
+
+This repository is unversioned, as [VERSIONING.md](VERSIONING.md) describes:
+no tags or releases. Workflow callers pin a commit SHA, which Renovate moves;
+Renovate reads the preset from `main`.
