@@ -284,7 +284,10 @@ a schedule the caller's `strategy`. The calling job grants `contents: write`
 and `actions: write`; the caller lists `workflow_dispatch` in its `on:`.
 
 Inputs: `strategy` (required, `conventional` or `commits`), `image`,
-`dockerfiles`, `base_image_pattern`, `dispatch_tag_build` (default `true`),
+`images` (several images for the fresh rebuild, `IMAGE=DOCKERFILE` entries;
+a repository that builds more than one image lists them all, since `image`
+with several Dockerfiles gets no fresh rebuild), `dockerfiles`,
+`base_image_pattern`, `dispatch_tag_build` (default `true`),
 `dispatch_workflow`, `metadata_command` and `upstream_command` (the tag
 schemes of [VERSIONING.md](VERSIONING.md); they exclude each other),
 `dry_run` (also true when the caller's `workflow_dispatch` has a `dry_run`
