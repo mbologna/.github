@@ -69,14 +69,6 @@ on:
         required: false
         type: string
         default: ""
-      upstream_command:
-        description: >-
-          Shell command, run in the checkout, printing the upstream version of
-          a patched upstream image: tags become v<upstream>+r<N>, which isn't
-          SemVer and which VERSIONING.md doesn't use. Excludes metadata_command
-        required: false
-        type: string
-        default: ""
       dry_run:
         description: >-
           Only print the next version and its notes, in the job summary. A
@@ -106,7 +98,7 @@ jobs:
     # would make every caller that doesn't grant it fail at startup on its next
     # pin bump; inheriting it instead confines the failure to the dispatch.
     container:
-      image: ghcr.io/mbologna/auto-release:1.3.0@sha256:9cf1b8bfa74b7d0006651e05bd6b4cd9033dc0cd959ef830fc923e3d6fbc36c8
+      image: ghcr.io/mbologna/auto-release:2.0.0@sha256:1d9eec77b1b06cd84e06c371a989b989fcf7f4f6d5171ec6789dd8d5ab0aa07a
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -132,7 +124,6 @@ jobs:
           AUTO_RELEASE_DISPATCH_WORKFLOW: ${{ inputs.dispatch_workflow || github.workflow_ref }}
           # Empty means unset to auto-release: plain vX.Y.Z tags.
           AUTO_RELEASE_METADATA_CMD: ${{ inputs.metadata_command }}
-          AUTO_RELEASE_UPSTREAM_CMD: ${{ inputs.upstream_command }}
           GITHUB_TOKEN: ${{ github.token }}
         # The strategy depends on what started the run:
         # - push: only a CVE fix (a fix(security) commit, a base image update

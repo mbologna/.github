@@ -96,8 +96,7 @@ that call the shared workflows pin them to a commit SHA, and Renovate moves the 
   - It needed date ordering in auto-release and a Renovate regex rule per image.
   
   thelounge-patched and one other patched image used it briefly (2026-11-20) before moving to
-  build metadata. auto-release still supports it (`upstream_command`), but no repository
-  uses it.
+  build metadata, and auto-release 2.0.0 removed it.
 
 ## Sources
 
