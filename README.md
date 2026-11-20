@@ -20,8 +20,8 @@ GitLab:
 
 | Event | What runs |
 |---|---|
-| Pull request | Commit check: commitlint over every commit, and no `fixup!` commits (pull requests merge with a merge commit, so the commits land as they are and auto-release reads their subjects). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push, the image policy check and the smoke test, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. |
-| Push to the default branch | Security check only: auto-release's `security` strategy releases a CVE fix at once, including a fresh rebuild when the last release is a week old and its image has fixable findings in packages it installs on top of its base. Nothing is built, except with `publish: push` (the Cloud Run repositories, which deploy every push that changes the image). |
+| Pull request | Commit check: commitlint over every commit, and no `fixup!` commits (pull requests merge with a merge commit, so the commits land as they are and auto-release reads their subjects). Language tests: lint, format check, tests, and an audit of the runtime dependencies. Image build without push, the image policy check and the smoke test, unless every changed file matches `skip_paths`. hadolint when the Dockerfile changed. Release preview: what the next scheduled auto-release would tag if the pull request merged now, in the job summary. |
+| Push to the default branch | Security check only: auto-release's `security` strategy releases a CVE fix at once, including a fresh rebuild when the last release is a week old and its image has fixable findings in packages it installs on top of its base. Nothing is built, except with `publish: push` (the Cloud Run repositories, which deploy every push that changes the image). Release preview: what the next scheduled auto-release would tag as the branch stands, in the job summary. |
 | Monday 06:00 UTC schedule | Conventional release: auto-release tags `vX.Y.Z` when a `feat`, `fix`, `perf`, `revert` or breaking commit landed since the last tag, or a fresh rebuild is due. Nothing is built or linted, with either `publish` mode: the tag it creates builds. |
 | Release tag `vX.Y.Z` (or `vX.Y.Z+<metadata>`, [VERSIONING.md](VERSIONING.md)) | Build, the image policy check and the smoke test; push `X.Y.Z`, `X.Y` and `latest`, then a Trivy report (fixable HIGH and CRITICAL findings; a report, not a gate) and a cosign keyless signature. |
 
@@ -276,11 +276,18 @@ Output: `digest`, the multi-arch digest (empty when nothing was pushed).
 ### auto-release.yml
 
 Runs the [auto-release](https://github.com/mbologna/auto-release) image: tags
-the next version and publishes its Release. It gates itself: it runs on a
-schedule, or on a push or manual run on the default branch, and skips
+the next version and publishes its Release. Its release job gates itself: it
+runs on a schedule, or on a push or manual run on the default branch, and skips
 everything else. A push runs the `security` strategy, a manual run `commits`,
 a schedule the caller's `strategy`. The calling job grants `contents: write`
 and `actions: write`; the caller lists `workflow_dispatch` in its `on:`.
+
+Its `preview` job runs `auto-release plan` with the caller's `strategy` on
+pull requests and on pushes to the default branch, and writes the next version
+and its notes, or "No release due", to the job summary: on a pull request as
+if it merged now, on a push as the branch stands. It scans no image, so a
+fresh rebuild only shows up on the scheduled run. It needs only
+`contents: read`. A docker-ci caller with `release_strategy` gets it as well.
 
 Inputs: `strategy` (required, `conventional` or `commits`), `image`,
 `images` (several images for the fresh rebuild, `IMAGE=DOCKERFILE` entries;
