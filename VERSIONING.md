@@ -47,10 +47,16 @@ version 1.0.0 of its patches, on The Lounge 4.5.2.
   as `7d1914b5-ls396` for a linuxserver build.
 - SemVer ignores build metadata when it orders versions, so the repository's own version
   orders its releases, and an upstream bump never makes a tag sort out of place.
-- An upstream update that breaks something for users is committed as breaking
-  (`feat(deps)!: update rancher to 2.16.0`), which bumps the major. rancher-platform's
-  Renovate config does this for every Rancher minor. A patch that changes behaviour users
-  rely on is breaking too.
+- An upstream update bumps by its own impact: an upstream patch is a patch, a minor is a
+  `feat(deps):`, and a major (or anything that breaks users) is a `feat(deps)!:`.
+  Without that, a `chore(deps)` upstream major would ship as a patch.
+  - Where Renovate moves the pin, the repository's `renovate.json` commits it that way.
+    rancher-platform commits every Rancher minor as breaking; thelounge-patched commits
+    The Lounge minors and majors.
+  - Where the pin is bumped by hand (bitlbee-container, saltstack-container), the commit
+    is typed that way.
+  - An upstream with no SemVer of its own, such as a linuxserver build, is a patch.
+  - A patch to the upstream that changes behaviour users rely on is breaking too.
 - A change in the pin releases on its own, as at least a patch, so the tags never lag
   behind it, even when the commit that moved it was a `chore(deps)`.
 - `up` is the only label, as in Rancher's own charts (`100.0.0+up16.6.0` tracks upstream
