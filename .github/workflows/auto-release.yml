@@ -25,6 +25,17 @@ on:
         required: false
         type: string
         default: ""
+      images:
+        description: >-
+          Several images built from this repository, for the fresh rebuild
+          instead of image: IMAGE=DOCKERFILE entries separated by spaces or
+          commas, each image without a tag and the Dockerfile it is built
+          from (e.g. "docker.io/example/app-master=Dockerfile-master
+          docker.io/example/app-minion=Dockerfile-minion"). One image with
+          findings a rebuild fixes releases. Empty means image alone
+        required: false
+        type: string
+        default: ""
       dockerfiles:
         description: >-
           Dockerfiles whose base images the security strategy compares,
@@ -111,6 +122,8 @@ jobs:
           EVENT: ${{ github.event_name }}
           STRATEGY: ${{ inputs.strategy }}
           AUTO_RELEASE_IMAGE: ${{ inputs.image }}
+          # Empty is the same as unset to auto-release.
+          AUTO_RELEASE_IMAGES: ${{ inputs.images }}
           AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
           AUTO_RELEASE_DISPATCH: ${{ inputs.dispatch_tag_build }}
           AUTO_RELEASE_DRY_RUN: ${{ inputs.dry_run || github.event.inputs.dry_run == 'true' }}
