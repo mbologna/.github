@@ -267,7 +267,7 @@ versions.) `smoke_cmd` decides what runs:
 | `dockerfiles` | the `dockerfile` input | Dockerfiles the security strategy compares |
 | `dispatch_workflow` | the calling workflow | Workflow auto-release starts on the new tag |
 | `release_metadata_command` | empty | Command printing the pinned upstream as build metadata (`up3.6` → `v5.2.0+up3.6`); see [VERSIONING.md](VERSIONING.md) |
-| `release_upstream_command` | empty | Command printing the upstream version of a patched upstream image (`4.5.2` → `v4.5.2+r1`, images `4.5.2-r1`, `4.5.2`, `4.5`, `latest`) |
+| `release_upstream_command` | empty | Command printing the upstream version of a patched upstream image (`4.5.2` → `v4.5.2+r1`, images `4.5.2-r1`, `4.5.2`, `4.5`, `latest`); not SemVer, and unused by [VERSIONING.md](VERSIONING.md) |
 | `deploy_type` | empty | `service` or `job`: deploy the image just pushed, by digest, to Cloud Run after a push or manual run on the default branch that pushed an image; empty deploys nothing |
 | `deploy_name` | `image_name` | Cloud Run service or job |
 | `region` | `us-central1` | Cloud Run region |
