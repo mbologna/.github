@@ -9,7 +9,7 @@ on:
         type: string
       legacy_image_names:
         description: >-
-          Optional comma-separated former names of the image (e.g. docker-bitlbee).
+          Optional comma-separated former names of the image (e.g. old-name).
           Every build also pushes, signs and cleans them, with the same tags and
           digest, so users of a renamed image keep getting updates: neither GHCR
           nor Docker Hub redirects a renamed repository. Keep it for as long as
