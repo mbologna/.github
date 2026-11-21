@@ -285,9 +285,13 @@ and `actions: write`; the caller lists `workflow_dispatch` in its `on:`.
 Its `preview` job runs `auto-release plan` with the caller's `strategy` on
 pull requests and on pushes to the default branch, and writes the next version
 and its notes, or "No release due", to the job summary: on a pull request as
-if it merged now, on a push as the branch stands. It scans no image, so a
-fresh rebuild only shows up on the scheduled run. It needs only
+if it merged now, on a push as the branch stands. It needs only
 `contents: read`. A docker-ci caller with `release_strategy` gets it as well.
+Its summary lists two releases it can't foresee. auto-release measures the
+last tag's age when it runs, so a maintenance release (`conventional`) or a
+fresh rebuild that only becomes due by the scheduled run shows up on that run
+alone. The preview scans no image either, but a fresh rebuild due now doesn't
+wait for the schedule: the push's `security` run releases it.
 
 Inputs: `strategy` (required, `conventional` or `commits`), `image`,
 `images` (several images for the fresh rebuild, `IMAGE=DOCKERFILE` entries;
