@@ -155,6 +155,21 @@
       "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)(-\\d+)?$"
     },
     {
+      "description": "Python that pre-commit runs a hook on (language_version: python3.15 in .pre-commit-config.yaml, set for mypy and bandit because they parse with the interpreter they run on). Looked up like the python_version input above, so it joins the python group and moves with the Dockerfile's base image and CI's Python in one PR; npm versioning keeps it two-part (3.15 to 3.16).",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)\\.pre-commit-config\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "language_version:\\s*['\"]?python(?<currentValue>\\d+\\.\\d+)['\"]?"
+      ],
+      "depNameTemplate": "python",
+      "packageNameTemplate": "actions/python-versions",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "npm",
+      "extractVersionTemplate": "^(?<version>\\d+\\.\\d+\\.\\d+)(-\\d+)?$"
+    },
+    {
       "description": "pip-audit version the reusable python-ci workflow runs with uvx (pip_audit_version: input in callers, default: under the pip_audit_version input here), from PyPI. No built-in manager reads a workflow input.",
       "customType": "regex",
       "managerFilePatterns": [
@@ -1052,7 +1067,7 @@
       "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
     },
     {
-      "description": "Python in one PR per repository: the Dockerfile's base image, the GitLab CI test image, the reusable workflows' python_version input and setup-python's python-version. They are the same language version, and separate PRs left CI testing 3.14 while the images ran 3.15 (5 repositories, 2026-11). Digest updates stay in the Docker base images group. A minor (3.15 to 3.16) is a new language version that removes deprecated APIs; it automerges like any minor because CI's version moves in the same PR, so green CI means the new version passed the tests. After the maintenance group, so it wins: a new language version gets its own PR and its own CI run, and a failure there doesn't hold the week's other updates.",
+      "description": "Python in one PR per repository: the Dockerfile's base image, the GitLab CI test image, the reusable workflows' python_version input, setup-python's python-version and pre-commit's language_version. They are the same language version, and separate PRs left CI testing 3.14 while the images ran 3.15 (5 repositories, 2026-11). Digest updates stay in the Docker base images group. A minor (3.15 to 3.16) is a new language version that removes deprecated APIs; it automerges like any minor because CI's version moves in the same PR, so green CI means the new version passed the tests. After the maintenance group, so it wins: a new language version gets its own PR and its own CI run, and a failure there doesn't hold the week's other updates.",
       "matchDepNames": [
         "python",
         "docker.io/library/python"
