@@ -1095,6 +1095,15 @@
       "groupName": "Docker base images"
     },
     {
+      "description": "Copier templates (python-app-template): one PR per template update, never the maintenance group's. Inside a group branch copier update never ran: 26 grouped PRs in 7 repositories (2026-11) only appended Renovate's '#copier updated' line to .copier-answers.yml, and Renovate reports nothing when copier leaves the answers file unchanged. Alone it updates the files (toggl-insights #48). After the groups above, so it wins. The title has the preset's from/to/type form, which commitlint-config's Renovate header rule accepts; the default named the whole git URL and had no from version (92 characters).",
+      "matchManagers": [
+        "copier"
+      ],
+      "groupName": null,
+      "commitMessageTopic": "copier/{{replace '[.]git$' '' (replace '.+/' '' depName)}}",
+      "commitMessageExtra": "from {{currentValue}} to {{newValue}} ({{updateType}})"
+    },
+    {
       "description": "Lock file maintenance automerges where the package manager holds the refresh to releases at least 7 days old: npm (install --before), Poetry (POETRY_SOLVER_MIN_RELEASE_AGE), uv.lock under pep621, whose consumers all set [tool.uv] exclude-newer = \"7 days\", and pip-compile, whose lock Renovate regenerates with the command in its header, so a repository that enables the pip-compile manager compiles with uv pip compile --exclude-newer P7D. A repository whose lock lacks that setting must add it before relying on this rule. Composer, cargo, bundler and the rest take whatever is newest, so they keep the manual review at the end.",
       "matchManagers": [
         "npm",
