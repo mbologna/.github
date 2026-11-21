@@ -77,10 +77,23 @@ on:
         type: boolean
         default: true
       enable_cosign:
-        description: Sign images with Cosign (keyless / OIDC)
+        description: >-
+          Sign images with Cosign (keyless / OIDC). A private repository is never
+          signed: a keyless signature puts the repository and workflow names in
+          the public Rekor log.
         required: false
         type: boolean
         default: true
+      platforms:
+        description: >-
+          Comma-separated platforms to build natively, each on its own runner:
+          linux/amd64 (required, the merge job runs the image there) and
+          optionally linux/arm64. linux/amd64 alone halves the build minutes of
+          an image that only runs on amd64 hosts, which counts in a private
+          repository.
+        required: false
+        type: string
+        default: linux/amd64,linux/arm64
       enable_integration_test:
         description: Run scripts/integration-test.sh after build
         required: false
@@ -215,6 +228,8 @@ jobs:
     outputs:
       build: ${{ steps.plan.outputs.build }}
       push: ${{ steps.plan.outputs.push }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      private: ${{ steps.plan.outputs.private }}
     steps:
       # Every later job keys off the build and push outputs, so nothing that
       # expects a pushed digest (merge, scans, signing, tests, cleanup,
@@ -229,12 +244,37 @@ jobs:
           DOCKERFILE: ${{ inputs.dockerfile }}
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          PLATFORMS: ${{ inputs.platforms }}
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$PUBLISH" != push ] && [ "$PUBLISH" != release ]; then
             echo "::error::publish must be 'push' or 'release', not '${PUBLISH}'"
             exit 1
           fi
+          # The build matrix: one native runner per platform.
+          matrix=""
+          amd64=false
+          IFS=', ' read -ra platforms <<< "$PLATFORMS"
+          for platform in "${platforms[@]}"; do
+            case "$platform" in
+              "") continue ;;
+              linux/amd64) runner=ubuntu-26.04; amd64=true ;;
+              linux/arm64) runner=ubuntu-24.04-arm ;;
+              *)
+                echo "::error::platforms takes linux/amd64 and linux/arm64, not '${platform}'"
+                exit 1
+                ;;
+            esac
+            matrix+="${matrix:+,}{\"platform\":\"${platform}\",\"runner\":\"${runner}\",\"cache_scope\":\"${platform//\//-}\"}"
+          done
+          if [ "$amd64" = false ]; then
+            echo "::error::platforms must include linux/amd64, not only '${PLATFORMS}'"
+            exit 1
+          fi
+          # A private repository gets no SARIF upload and no signature (see
+          # the scan-trivy and sign jobs). A schedule's payload has no
+          # repository, so ask the API.
+          private=$(gh api "repos/${GITHUB_REPOSITORY}" --jq .private)
           build=true
           push=false
           lint=true
@@ -306,6 +346,8 @@ jobs:
             echo "push=${push}"
             echo "lint=${lint}"
             echo "hadolint=${hadolint}"
+            echo "matrix=[${matrix}]"
+            echo "private=${private}"
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -357,13 +399,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-26.04
-            cache_scope: linux-amd64
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            cache_scope: linux-arm64
+        include: ${{ fromJSON(needs.lint.outputs.matrix) }}
     steps:
       - name: Nothing to build
         if: needs.lint.outputs.build != 'true'
@@ -851,19 +887,21 @@ jobs:
   scan-trivy:
     name: Security Scan (trivy)
     runs-on: ubuntu-26.04
-    needs: merge
+    needs: [lint, merge]
     # merge runs only when the build pushed (see lint's plan step).
     if: needs.merge.result == 'success'
     permissions:
       security-events: write
       contents: read
     steps:
+      # A private repository on GitHub Free has no code scanning to take the
+      # SARIF: there the report is a table in the job summary.
       - name: Run Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
-          format: sarif
-          output: trivy-results.sarif
+          format: ${{ needs.lint.outputs.private == 'true' && 'table' || 'sarif' }}
+          output: ${{ needs.lint.outputs.private == 'true' && 'trivy-results.txt' || 'trivy-results.sarif' }}
           # The filter of the whole pipeline (auto-release's base-image check,
           # GitLab's release scan): fixable HIGH and CRITICAL findings only.
           # A report, not a gate: no exit-code.
@@ -871,6 +909,16 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
           timeout: 10m
+
+      - name: Trivy report in the job summary
+        if: always() && hashFiles('trivy-results.txt') != ''
+        run: |
+          {
+            echo '### Trivy: fixable HIGH and CRITICAL findings'
+            echo '```'
+            cat trivy-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Trivy SARIF
         if: always() && hashFiles('trivy-results.sarif') != ''
@@ -882,8 +930,8 @@ jobs:
   sign:
     name: Sign Images
     runs-on: ubuntu-26.04
-    needs: merge
-    if: inputs.enable_cosign && needs.merge.result == 'success'
+    needs: [lint, merge]
+    if: inputs.enable_cosign && needs.lint.outputs.private != 'true' && needs.merge.result == 'success'
     permissions:
       id-token: write
       packages: write

@@ -224,6 +224,14 @@ test, the multi-arch manifest, SBOM, Trivy, cosign, an
 optional integration test and GHCR cleanup. Optionally runs `auto-release.yml`
 and `gcp-deploy.yml` as nested jobs.
 
+In a private repository, the image is private on GHCR too, and two steps
+change. Trivy writes its report to the job summary, because GitHub Free has
+no code scanning for private repositories to take the SARIF. Cosign signs
+nothing, because a keyless signature records the repository and workflow
+names in the public Rekor log. Builds there use the account's Actions
+minutes: `platforms: linux/amd64` halves them for an image that runs only on
+amd64 hosts, and its ruleset then requires only `Build (linux/amd64)`.
+
 The smoke test runs each platform's image right after the image policy
 check, loaded from the same OCI layout, with no network and a 120-second
 limit. A failure stops the build job before it exports the digest, so the
@@ -259,7 +267,8 @@ versions.) `smoke_cmd` decides what runs:
 | `version_command` | empty | Command run in the image that prints a version to tag |
 | `extra_tags` | empty | Extra docker/metadata-action tag rules |
 | `push_to_dockerhub` | `true` | Also push to Docker Hub (`DOCKER_USERNAME`, `DOCKER_PASSWORD`) |
-| `enable_cosign` | `true` | Sign the images |
+| `enable_cosign` | `true` | Sign the images (never in a private repository) |
+| `platforms` | `linux/amd64,linux/arm64` | Platforms to build, each on a native runner; `linux/amd64` is required |
 | `enable_integration_test` | `false` | Run `scripts/integration-test.sh` against the pushed image |
 | `yamllint_paths` | `.github/workflows/` | Paths for yamllint |
 | `release_strategy` | empty | Runs auto-release after the build with this scheduled strategy (normally `conventional`); empty runs none. The calling job grants `contents: write` and `actions: write` |
