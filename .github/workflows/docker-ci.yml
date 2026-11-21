@@ -893,11 +893,17 @@ jobs:
     permissions:
       security-events: write
       contents: read
+      # A private repository's image is private on GHCR too: Trivy pulls it
+      # with this job's token (anonymous pulls work only for public images).
+      packages: read
     steps:
       # A private repository on GitHub Free has no code scanning to take the
       # SARIF: there the report is a table in the job summary.
       - name: Run Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@${{ needs.merge.outputs.digest }}
           format: ${{ needs.lint.outputs.private == 'true' && 'table' || 'sarif' }}
