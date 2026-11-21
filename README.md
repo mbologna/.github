@@ -10,8 +10,8 @@ repositories under `mbologna`. The GitLab projects get the same pipeline from
 - [`.github/workflows/`](.github/workflows): reusable workflows. Callers pin
   them to a commit SHA with a `# main` comment, and Renovate moves the pin.
 - [`VERSIONING.md`](VERSIONING.md): how every repository versions its
-  releases: SemVer, SemVer with the upstream as build metadata, or upstream
-  version and release number.
+  releases: SemVer, SemVer with the upstream as build metadata, or no
+  releases at all (unversioned).
 
 ## Pipeline contract
 
