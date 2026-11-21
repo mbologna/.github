@@ -28,4 +28,4 @@ jobs:
     # one also grants contents: read, which the push mode's compare and commit
     # API calls need there.
     steps:
-      - uses: mbologna/commitlint-config@369e316de225dab75f9b4e3ba9deca6704ecfb3c # v0.3.0
+      - uses: mbologna/commitlint-config@23ab797c1e9d45ee708085d81b2a04c610ad015f # v0.3.1
