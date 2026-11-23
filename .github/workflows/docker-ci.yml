@@ -72,10 +72,13 @@ on:
         type: string
         default: ""
       push_to_dockerhub:
-        description: Also push to Docker Hub (requires DOCKER_USERNAME / DOCKER_PASSWORD secrets)
+        description: >-
+          Also push to Docker Hub (requires DOCKER_USERNAME / DOCKER_PASSWORD
+          secrets). Off by default: images go to GHCR, and only the few
+          published on Docker Hub too opt in.
         required: false
         type: boolean
-        default: true
+        default: false
       enable_cosign:
         description: >-
           Sign images with Cosign (keyless / OIDC). A private repository is never

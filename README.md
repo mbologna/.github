@@ -27,7 +27,8 @@ GitLab:
 
 What differs from GitLab, on purpose:
 
-- **Registries:** GHCR and Docker Hub here, the GitLab project registry there.
+- **Registries:** GHCR here (Docker Hub too for an image that sets
+  `push_to_dockerhub`), the GitLab project registry there.
 - **Architectures:** images here are built for linux/amd64 and linux/arm64,
   because some consumers run on arm64. GitLab images are amd64 only.
 - **Runners:** GitHub-hosted here; the self-hosted runner or gitlab.com's
@@ -267,7 +268,7 @@ versions.) `smoke_cmd` decides what runs:
 | `smoke_cmd` | empty | Smoke test: a shell command that must exit 0 in the built image; empty runs the entrypoint with `--help` and only warns; `none` skips it |
 | `version_command` | empty | Command run in the image that prints a version to tag |
 | `extra_tags` | empty | Extra docker/metadata-action tag rules |
-| `push_to_dockerhub` | `true` | Also push to Docker Hub (`DOCKER_USERNAME`, `DOCKER_PASSWORD`) |
+| `push_to_dockerhub` | `false` | Also push to Docker Hub (`DOCKER_USERNAME`, `DOCKER_PASSWORD`) |
 | `enable_cosign` | `true` | Sign the images (never in a private repository) |
 | `platforms` | `linux/amd64,linux/arm64` | Platforms to build, each on a native runner; `linux/amd64` is required |
 | `enable_integration_test` | `false` | Run `scripts/integration-test.sh` against the pushed image |
