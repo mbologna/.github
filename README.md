@@ -403,6 +403,20 @@ in the pull request.
 `renovate-config-validate.yml` is not reusable: it validates
 `renovate-config.json` when it changes here.
 
+## Why not an existing tool
+
+- [docker/github-builder](https://github.com/docker/github-builder)
+  (Docker's reusable build workflows) covers the multi-platform build, the
+  SBOM and cosign signing. It has no hadolint or yamllint checks, no image
+  policy check or smoke test before the push, no Trivy SARIF upload, no
+  registry cleanup, no release step and no Cloud Run deploy.
+- No upstream project publishes reusable workflows for uv-based Python CI,
+  OpenTofu CI or npm trusted publishing.
+- The shared Renovate preset is already Renovate configuration, so there is
+  no other tool to swap in.
+
+Checked 2026-11-23.
+
 ## Versioning
 
 This repository is unversioned, as [VERSIONING.md](VERSIONING.md) describes:
