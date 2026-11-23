@@ -506,7 +506,7 @@
       "pinDigests": false
     },
     {
-      "description": "A uv/PEP 621 git source (apprise-notify = { git = ..., tag = \"v1.2.0\" } in pyproject.toml) is looked up as a git tag; pinning it to a commit SHA cannot be written (\"Error updating branch: update failure\" on Pin dependency apprise-notify in auditors, 2026-11-16).",
+      "description": "A uv/PEP 621 git source (apprise-notify = { git = ..., tag = \"v1.2.0\" } in pyproject.toml) is looked up as a git tag; pinning it to a commit SHA cannot be written (\"Error updating branch: update failure\" on Pin dependency apprise-notify in a private repository, 2026-11-16).",
       "matchManagers": ["pep621"],
       "matchDatasources": ["git-tags", "github-tags", "gitlab-tags"],
       "pinDigests": false
@@ -1095,7 +1095,7 @@
       "groupName": "Docker base images"
     },
     {
-      "description": "Copier templates (python-app-template): one PR per template update, never the maintenance group's. Inside a group branch copier update never ran: 26 grouped PRs in 7 repositories (2026-11) only appended Renovate's '#copier updated' line to .copier-answers.yml, and Renovate reports nothing when copier leaves the answers file unchanged. Alone it updates the files (toggl-insights #48, book-serial #3). After the groups above, so it wins. The title has the preset's from/to/type form, which commitlint-config's Renovate header rule accepts; the default named the whole git URL and had no from version (92 characters).",
+      "description": "Copier templates (python-app-template): one PR per template update, never the maintenance group's. Inside a group branch copier update never ran: 26 grouped PRs in 7 repositories (2026-11) only appended Renovate's '#copier updated' line to .copier-answers.yml, and Renovate reports nothing when copier leaves the answers file unchanged. Alone it updates the files (toggl-insights #48). After the groups above, so it wins. The title has the preset's from/to/type form, which commitlint-config's Renovate header rule accepts; the default named the whole git URL and had no from version (92 characters).",
       "matchManagers": [
         "copier"
       ],

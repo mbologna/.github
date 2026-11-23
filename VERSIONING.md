@@ -18,8 +18,8 @@ repository states its scheme in a `Versioning` section of its README and of its 
 | Scheme | Git tag | Image tags | Repositories |
 |---|---|---|---|
 | SemVer | `v1.4.0` | `1.4.0`, `1.4`, `latest` | most: apps, tools, packages, shared tooling |
-| SemVer + upstream | `v2.2.0+up2.15.3` | `2.2.0`, `2.2`, `latest` | rancher-platform, bitlbee-container, saltstack-container, thelounge-patched, lazylibrarian-calibre |
-| Unversioned | none | none | .github, michelebologna.net, dotfiles, upgrade-aged, personal-system, wallpaper-shortcuts |
+| SemVer + upstream | `v2.2.0+up2.15.3` | `2.2.0`, `2.2`, `latest` | rancher-platform, bitlbee-container, saltstack-container, thelounge-patched |
+| Unversioned | none | none | .github, upgrade-aged, the website, configuration repositories |
 
 ## SemVer
 
@@ -95,7 +95,7 @@ that call the shared workflows pin them to a commit SHA, and Renovate moves the 
   - A breaking patch can't say so.
   - It needed date ordering in auto-release and a Renovate regex rule per image.
   
-  thelounge-patched and lazylibrarian-calibre used it briefly (2026-11-20) before moving to
+  thelounge-patched and one other patched image used it briefly (2026-11-20) before moving to
   build metadata, and auto-release 2.0.0 removed it.
 
 ## Sources
