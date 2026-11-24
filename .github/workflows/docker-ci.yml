@@ -116,7 +116,7 @@ on:
         description: >-
           When to push the image. 'push': on the default branch and on tags;
           other branches and pull requests build without pushing, and a
-          schedule builds nothing (it only runs auto-release).
+          schedule builds nothing.
           'release': only on v* tags (pushed, or dispatched on the tag ref, as
           auto-release does); pull requests build without pushing and branch
           pushes only lint, and latest moves to the newest release.
@@ -143,49 +143,6 @@ on:
           .pre-commit-config.yaml
           .gitignore
           LICENSE
-      release_strategy:
-        description: >-
-          Runs auto-release.yml after the build when set: its strategy for
-          Monday's schedule, normally 'conventional'. Empty (the default) runs
-          no release. A push to the default branch releases only a CVE fix and
-          a manual run releases whatever is unreleased; pull requests, other
-          branches and tag builds skip it (the gate is in auto-release.yml).
-          The calling job must grant contents: write (the tag and the Release)
-          and actions: write (to dispatch the tag build), and the caller must
-          list workflow_dispatch in its on:.
-        required: false
-        type: string
-        default: ""
-      release_image:
-        description: >-
-          Image without a tag that auto-release logs in to; empty means
-          ghcr.io/<owner>/<image_name>
-        required: false
-        type: string
-        default: ""
-      dockerfiles:
-        description: >-
-          Dockerfiles whose base images auto-release's security strategy
-          compares, separated by spaces or commas; empty means the dockerfile
-          input
-        required: false
-        type: string
-        default: ""
-      dispatch_workflow:
-        description: >-
-          Workflow file auto-release starts on the new tag; empty means the
-          calling workflow
-        required: false
-        type: string
-        default: ""
-      release_metadata_command:
-        description: >-
-          Shell command printing the pinned upstream version as SemVer build
-          metadata (e.g. up3.6 -> tag v5.2.0+up3.6); passed to auto-release.yml
-          as metadata_command. Images stay X.Y.Z, X.Y and latest
-        required: false
-        type: string
-        default: ""
       deploy_type:
         description: >-
           Deploys the image to Cloud Run with gcp-deploy.yml when set: 'service'
@@ -289,12 +246,11 @@ jobs:
           if [ "$EVENT" = pull_request ]; then
             : # build to check the Dockerfile, never push
           elif [ "$EVENT" = schedule ]; then
-            # Monday's schedule only runs the nested auto-release job, which
-            # needs this run to finish, not to build: a release it tags builds
-            # on the tag. A push-mode caller used to build and push a sha-*
-            # image here every week that nothing deployed (the deploy job runs
-            # on pushes and manual runs only). The commit on main was linted
-            # when it landed.
+            # Monday's schedule builds nothing: the caller's auto-release job
+            # tags any release, which builds on the tag. A push-mode caller
+            # used to build and push a sha-* image here every week that
+            # nothing deployed (the deploy job runs on pushes and manual runs
+            # only). The commit on main was linted when it landed.
             build=false
             lint=false
           elif [ "$PUBLISH" = release ]; then
@@ -1089,29 +1045,6 @@ jobs:
           # Signatures, attestations and SBOM referrers (sha256-<digest> tags)
           # whose image is gone: deleting an image left them behind.
           delete-orphaned-images: true
-
-  # auto-release.yml carries its own gate (schedule, or a push or manual run
-  # on the default branch), so this job only needs a strategy. It follows the
-  # build job, which always runs and is a no-op when nothing was built: a push
-  # that publish: release or skip_paths left unbuilt still gets its CVE check.
-  # No permissions block, as in auto-release.yml: it takes the calling job's,
-  # so a caller without actions: write fails at the dispatch, not at startup.
-  # GitHub checks a nested job's permissions when the run starts, even if its
-  # if: skips it, so declaring contents: write and actions: write here would
-  # stop every caller that doesn't release from docker-ci, and grants less, from
-  # starting. Hence the zizmor ignore.
-  # A ./ path in a reusable workflow resolves to this repository at the commit
-  # the caller pinned, not to the caller's repository.
-  auto-release: # zizmor: ignore[excessive-permissions]
-    needs: [lint, build]
-    if: inputs.release_strategy != ''
-    uses: ./.github/workflows/auto-release.yml
-    with:
-      strategy: ${{ inputs.release_strategy }}
-      image: ${{ inputs.release_image || format('ghcr.io/{0}/{1}', github.repository_owner, inputs.image_name) }}
-      dockerfiles: ${{ inputs.dockerfiles || inputs.dockerfile }}
-      dispatch_workflow: ${{ inputs.dispatch_workflow }}
-      metadata_command: ${{ inputs.release_metadata_command }}
 
   # Runs this commit's sha-* image on Cloud Run, only when the merge job
   # pushed one on the default branch: a docs- or CI-only push that skip_paths

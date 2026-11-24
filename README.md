@@ -58,8 +58,7 @@ jobs:
   docker:
     needs: python
     permissions:
-      contents: write        # the release tag and its Release
-      actions: write         # dispatch the tag build
+      contents: read
       packages: write        # push to GHCR
       id-token: write        # cosign keyless signing
       attestations: write
@@ -68,8 +67,18 @@ jobs:
     with:
       image_name: my-app
       publish: release
-      release_strategy: conventional
     secrets: inherit
+
+  auto-release:
+    needs: [python, docker]
+    permissions:
+      contents: write        # the release tag and its Release
+      actions: write         # dispatch the tag build
+    uses: mbologna/.github/.github/workflows/auto-release.yml@<sha> # main
+    with:
+      strategy: conventional
+      image: ghcr.io/<owner>/my-app
+      dockerfiles: Dockerfile
 ```
 
 plus a `commits.yml` that calls `commits.yml` on `pull_request`. Every
@@ -273,11 +282,6 @@ versions.) `smoke_cmd` decides what runs:
 | `platforms` | `linux/amd64,linux/arm64` | Platforms to build, each on a native runner; `linux/amd64` is required |
 | `enable_integration_test` | `false` | Run `scripts/integration-test.sh` against the pushed image |
 | `yamllint_paths` | `.github/workflows/` | Paths for yamllint |
-| `release_strategy` | empty | Runs auto-release after the build with this scheduled strategy (normally `conventional`); empty runs none. The calling job grants `contents: write` and `actions: write` |
-| `release_image` | `ghcr.io/<owner>/<image_name>` | Image auto-release logs in to and scans for a fresh rebuild |
-| `dockerfiles` | the `dockerfile` input | Dockerfiles the security strategy compares |
-| `dispatch_workflow` | the calling workflow | Workflow auto-release starts on the new tag |
-| `release_metadata_command` | empty | Command printing the pinned upstream as build metadata (`up3.6` → `v5.2.0+up3.6`); see [VERSIONING.md](VERSIONING.md) |
 | `deploy_type` | empty | `service` or `job`: deploy the image just pushed, by digest, to Cloud Run after a push or manual run on the default branch that pushed an image; empty deploys nothing |
 | `deploy_name` | `image_name` | Cloud Run service or job |
 | `region` | `us-central1` | Cloud Run region |
@@ -297,7 +301,7 @@ Its `preview` job runs `auto-release plan` with the caller's `strategy` on
 pull requests and on pushes to the default branch, and writes the next version
 and its notes, or "No release due", to the job summary: on a pull request as
 if it merged now, on a push as the branch stands. It needs only
-`contents: read`. A docker-ci caller with `release_strategy` gets it as well.
+`contents: read`.
 Its summary lists two releases it can't foresee. auto-release measures the
 last tag's age when it runs, so a maintenance release (`conventional`) or a
 fresh rebuild that only becomes due by the scheduled run shows up on that run
