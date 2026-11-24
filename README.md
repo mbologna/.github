@@ -376,7 +376,9 @@ auto-release dispatches.
 Terraform and OpenTofu fmt and validate, tflint, yamllint, actionlint, a Trivy
 config scan and optional ShellCheck. Inputs: `terraform_version`,
 `opentofu_version`, `working_dir`, `example_dir`, `enable_shellcheck`,
-`shellcheck_files`.
+`shellcheck_files`. tflint uses the repository root's `.tflint.hcl`, if any, for
+every module directory; yamllint checks `gitops/` and `.github/workflows/`,
+whichever exist.
 
 ### commits.yml
 

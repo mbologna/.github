@@ -79,11 +79,18 @@ jobs:
         with:
           tflint_version: v0.66.0
 
+      # A root .tflint.hcl configures the plugins (such as the AWS ruleset). --recursive reads the
+      # .tflint.hcl of each module directory instead, so pass the root one explicitly.
       - name: tflint init
         run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: tflint
-        run: tflint --recursive
+        run: |
+          config=()
+          [ -f .tflint.hcl ] && config=(--config "${PWD}/.tflint.hcl")
+          tflint --recursive "${config[@]}"
 
   opentofu:
     name: OpenTofu Validate
@@ -128,10 +135,14 @@ jobs:
       - name: Install yamllint
         run: pip install yamllint
 
+      # Only the directories the caller has: yamllint fails on a missing path.
       - name: yamllint
         run: |
-          yamllint -d '{extends: relaxed, rules: {line-length: {max: 200}}}' \
-            gitops/ .github/workflows/
+          paths=()
+          for path in gitops .github/workflows; do
+            [ -d "${path}" ] && paths+=("${path}/")
+          done
+          yamllint -d '{extends: relaxed, rules: {line-length: {max: 200}}}' "${paths[@]}"
         continue-on-error: true
 
   actionlint:
