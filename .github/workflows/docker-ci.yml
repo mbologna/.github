@@ -221,6 +221,11 @@ on:
         required: false
       DOCKER_PASSWORD:
         required: false
+      # Only for deploy_type: passed on to gcp-deploy.yml, which requires them.
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: false
+      GCP_SERVICE_ACCOUNT:
+        required: false
 
 jobs:
   lint:
@@ -1091,9 +1096,13 @@ jobs:
   # that publish: release or skip_paths left unbuilt still gets its CVE check.
   # No permissions block, as in auto-release.yml: it takes the calling job's,
   # so a caller without actions: write fails at the dispatch, not at startup.
+  # GitHub checks a nested job's permissions when the run starts, even if its
+  # if: skips it, so declaring contents: write and actions: write here would
+  # stop every caller that doesn't release from docker-ci, and grants less, from
+  # starting. Hence the zizmor ignore.
   # A ./ path in a reusable workflow resolves to this repository at the commit
   # the caller pinned, not to the caller's repository.
-  auto-release:
+  auto-release: # zizmor: ignore[excessive-permissions]
     needs: [lint, build]
     if: inputs.release_strategy != ''
     uses: ./.github/workflows/auto-release.yml
@@ -1123,4 +1132,7 @@ jobs:
       deploy_type: ${{ inputs.deploy_type }}
       deploy_name: ${{ inputs.deploy_name || inputs.image_name }}
       region: ${{ inputs.region }}
-    secrets: inherit
+    # Only the two secrets gcp-deploy.yml declares, not every secret of the caller.
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
