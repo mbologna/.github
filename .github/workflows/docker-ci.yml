@@ -701,10 +701,11 @@ jobs:
 
       - name: Export digest
         if: needs.lint.outputs.push == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+          touch "/tmp/digests/${DIGEST#sha256:}"
 
       - name: Upload digest artifact
         if: needs.lint.outputs.push == 'true'
@@ -859,13 +860,15 @@ jobs:
       - name: Create multi-arch manifest and push tags
         id: merge
         working-directory: /tmp/digests
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}@sha256:%s ' *)
+            $(printf "${IMAGE}@sha256:%s " *)
           SHORT_SHA="${GITHUB_SHA::7}"
           DIGEST=$(docker buildx imagetools inspect \
-            "ghcr.io/${{ github.repository_owner }}/${{ inputs.image_name }}:sha-${SHORT_SHA}" \
+            "${IMAGE}:sha-${SHORT_SHA}" \
             --format '{{json .Manifest}}' | jq -r '.digest')
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
