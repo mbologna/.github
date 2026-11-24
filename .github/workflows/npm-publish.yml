@@ -68,18 +68,21 @@ jobs:
         if: github.event.release.tag_name != '' || github.ref_type == 'tag'
         env:
           TAG: ${{ github.event.release.tag_name || github.ref_name }}
+          PACKAGE_MANAGER: ${{ inputs.package_manager }}
         run: |
           set -euo pipefail
           VERSION="${TAG#v}"
           echo "Release tag: ${TAG} -> version ${VERSION}"
-          if [ "${{ inputs.package_manager }}" = "yarn" ]; then
+          if [ "${PACKAGE_MANAGER}" = "yarn" ]; then
             yarn version --new-version "${VERSION}" --no-git-tag-version
           else
             npm version "${VERSION}" --no-git-tag-version --allow-same-version
           fi
 
       - name: Lint
-        run: ${{ inputs.package_manager }} run lint
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package_manager }}
+        run: '"${PACKAGE_MANAGER}" run lint'
         continue-on-error: true
 
       - name: Publish to npm (Trusted Publishing OIDC)

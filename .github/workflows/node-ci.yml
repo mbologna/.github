@@ -99,7 +99,9 @@ jobs:
         run: yarn --frozen-lockfile --non-interactive
 
       - name: Lint
-        run: ${{ inputs.package_manager }} run lint
+        env:
+          PACKAGE_MANAGER: ${{ inputs.package_manager }}
+        run: '"${PACKAGE_MANAGER}" run lint'
         continue-on-error: true
 
       # The coverage gate. node refuses the test runner's coverage flags in
@@ -169,8 +171,12 @@ jobs:
         if: inputs.package_manager == 'yarn'
         run: yarn --frozen-lockfile --non-interactive
 
+      # build_command is a shell command by contract; the environment carries it so the
+      # expression is never spliced into the script text.
       - name: Build
-        run: ${{ inputs.build_command }}
+        env:
+          BUILD_COMMAND: ${{ inputs.build_command }}
+        run: eval "${BUILD_COMMAND}"
 
       - name: Upload artifact
         if: inputs.build_artifact_path != ''
@@ -206,4 +212,10 @@ jobs:
         run: yarn --frozen-lockfile --non-interactive
 
       - name: Audit
-        run: npm audit --audit-level=${{ inputs.audit_level }}${{ inputs.audit_omit_dev && ' --omit=dev' || '' }}
+        env:
+          AUDIT_LEVEL: ${{ inputs.audit_level }}
+          OMIT_DEV: ${{ inputs.audit_omit_dev }}
+        run: |
+          omit=()
+          if [ "${OMIT_DEV}" = true ]; then omit=(--omit=dev); fi
+          npm audit --audit-level="${AUDIT_LEVEL}" "${omit[@]}"
