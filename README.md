@@ -387,8 +387,9 @@ whichever exist.
 action, the shared commit rules: config-conventional, 72-character header
 and body lines (Renovate's `update … from … to … (<type>)` headers up to
 100), no `Co-authored-by` or AI "Generated with" lines, and no `fixup!`,
-`squash!` or `amend!` commits. It reads the messages from the API, so it
-needs only `pull-requests: read`. It replaced `pr-title.yml` on 2026-11-18;
+`squash!` or `amend!` commits. Its job declares `contents: read` and
+`pull-requests: read`, and GitHub starts no run whose called job asks for
+more than the caller grants, so a caller grants both. It replaced `pr-title.yml` on 2026-11-18;
 since 2026-11-19 every forge merges with a merge commit, so the linted
 commits are the ones that land.
 

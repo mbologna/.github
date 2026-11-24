@@ -20,14 +20,15 @@ on:
   pull_request:
 
 jobs:
-  commits: # zizmor: ignore[excessive-permissions]
+  commits:
     name: Conventional commits
     runs-on: ubuntu-26.04
-    # No permissions block: the job takes the caller's, which a called job
-    # could only narrow. Public callers grant pull-requests: read; a private
-    # one also grants contents: read, which the push mode's compare and commit
-    # API calls need there. GitHub refuses to start a run whose called job asks
-    # for more than the caller grants, so neither set fits every caller; each
-    # caller's own block is what limits the token. Hence the zizmor ignore.
+    # pull-requests: read lists a pull request's commits; contents: read lets
+    # the push mode's compare and commit API calls, and the history clone,
+    # read a private repository. GitHub starts no run whose called job asks
+    # for more than the caller grants, so every caller grants both.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: mbologna/commitlint-config@23ab797c1e9d45ee708085d81b2a04c610ad015f # v0.3.1
