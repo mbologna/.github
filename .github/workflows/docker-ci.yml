@@ -355,6 +355,8 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: steps.plan.outputs.lint == 'true'
+        with:
+          persist-credentials: false
 
       - name: Hadolint
         if: steps.plan.outputs.hadolint == 'true'
@@ -410,6 +412,8 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: needs.lint.outputs.build == 'true'
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         if: needs.lint.outputs.build == 'true'
@@ -724,7 +728,9 @@ jobs:
     outputs:
       digest: ${{ steps.merge.outputs.digest }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Keeps the checkout's credentials: git ls-remote origin below needs them in a private
+      # repository.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
 
       # publish: release pushes only tag builds, and latest goes to the newest
       # release, so dispatching an older tag's build again leaves it alone.
@@ -1014,6 +1020,8 @@ jobs:
       packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Login to GHCR
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4

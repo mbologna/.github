@@ -49,6 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
           # A PR checks out its merge commit; depth 2 brings its first parent,
           # the base branch, so the scope step can diff against it.
           fetch-depth: 2

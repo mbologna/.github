@@ -100,7 +100,9 @@ jobs:
     container:
       image: ghcr.io/mbologna/auto-release:2.0.0@sha256:1d9eec77b1b06cd84e06c371a989b989fcf7f4f6d5171ec6789dd8d5ab0aa07a
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Keeps the checkout's credentials: auto-release fetches tags from origin, which needs
+      # them in a private repository.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
         with:
           fetch-depth: 0
 
@@ -175,7 +177,9 @@ jobs:
     container:
       image: ghcr.io/mbologna/auto-release:2.0.0@sha256:1d9eec77b1b06cd84e06c371a989b989fcf7f4f6d5171ec6789dd8d5ab0aa07a
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Keeps the checkout's credentials: auto-release fetches tags from origin, which needs
+      # them in a private repository.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
         with:
           fetch-depth: 0
 
