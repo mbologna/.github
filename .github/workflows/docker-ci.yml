@@ -734,9 +734,9 @@ jobs:
     outputs:
       digest: ${{ steps.merge.outputs.digest }}
     steps:
-      # Keeps the checkout's credentials: git ls-remote origin below needs them in a private
-      # repository.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       # publish: release pushes only tag builds, and latest goes to the newest
       # release, so dispatching an older tag's build again leaves it alone.
@@ -748,6 +748,12 @@ jobs:
         id: rules
         env:
           PUBLISH: ${{ inputs.publish }}
+          # Git reads the token from this step's environment for git ls-remote origin,
+          # so the checkout stores no credentials in .git/config.
+          GITHUB_TOKEN: ${{ github.token }}
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: credential.${{ github.server_url }}.helper
+          GIT_CONFIG_VALUE_0: '!f() { echo username=x-access-token; echo "password=${GITHUB_TOKEN}"; }; f'
         run: |
           set -euo pipefail
           if [ "$PUBLISH" = release ]; then

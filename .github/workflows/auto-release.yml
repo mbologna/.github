@@ -100,11 +100,10 @@ jobs:
     container:
       image: ghcr.io/mbologna/auto-release:2.0.0@sha256:1d9eec77b1b06cd84e06c371a989b989fcf7f4f6d5171ec6789dd8d5ab0aa07a
     steps:
-      # Keeps the checkout's credentials: auto-release fetches tags from origin, which needs
-      # them in a private repository.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # A tag pushed with GITHUB_TOKEN never triggers the caller's `push: tags`
       # run (GitHub's anti-recursion rule), so auto-release starts the build
@@ -127,6 +126,11 @@ jobs:
           # Empty means unset to auto-release: plain vX.Y.Z tags.
           AUTO_RELEASE_METADATA_CMD: ${{ inputs.metadata_command }}
           GITHUB_TOKEN: ${{ github.token }}
+          # Git reads the token from this step's environment for its fetch from origin,
+          # so the checkout stores no credentials in .git/config.
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: credential.${{ github.server_url }}.helper
+          GIT_CONFIG_VALUE_0: '!f() { echo username=x-access-token; echo "password=${GITHUB_TOKEN}"; }; f'
         # The strategy depends on what started the run:
         # - push: only a CVE fix (a fix(security) commit, a base image update
         #   that dropped fixable HIGH/CRITICAL findings, or a fresh rebuild
@@ -177,11 +181,10 @@ jobs:
     container:
       image: ghcr.io/mbologna/auto-release:2.0.0@sha256:1d9eec77b1b06cd84e06c371a989b989fcf7f4f6d5171ec6789dd8d5ab0aa07a
     steps:
-      # Keeps the checkout's credentials: auto-release fetches tags from origin, which needs
-      # them in a private repository.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7 # zizmor: ignore[artipacked]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       # A pull request checks out GitHub's test merge, whose "Merge <sha> into
       # <sha>" subject would land in the notes. Give it the subject the real
@@ -204,6 +207,11 @@ jobs:
           AUTO_RELEASE_BASE_IMAGE_PATTERN: ${{ inputs.base_image_pattern }}
           AUTO_RELEASE_METADATA_CMD: ${{ inputs.metadata_command }}
           GITHUB_TOKEN: ${{ github.token }}
+          # Git reads the token from this step's environment for its fetch from origin,
+          # so the checkout stores no credentials in .git/config.
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: credential.${{ github.server_url }}.helper
+          GIT_CONFIG_VALUE_0: '!f() { echo username=x-access-token; echo "password=${GITHUB_TOKEN}"; }; f'
         run: |
           scheduled=$STRATEGY
           if [ "$scheduled" = docker ]; then scheduled=conventional; fi
